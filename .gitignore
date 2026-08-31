@@ -1,0 +1,22 @@
+# 操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器 / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 日志与临时文件
+*.log
+*.tmp
+*.bak
+._*
+
+# 本地数据备份（按需取消注释，避免误传个人数据）
+# 三层任务池备份-*.json
+
+# 依赖（本项目为零依赖单文件，正常情况下不会出现）
+node_modules/

@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="description" content="三层任务池 · 本地单文件任务管理工具（战略总池 / 本周聚焦 / 今日动态）">
+<title>三层任务池 · Three-Layer Task Pool</title>
+<style>
+  :root{
+    --bg:#F7F6F2; --card:#FFFFFF; --ink:#1F2328; --muted:#9A958C; --faint:#BDB8AE;
+    --hairline:#E9E6DF; --hairline-strong:#D6D2C9;
+    --amber:#EFA63B; --amber-soft:#FBF2E1;
+    --red:#E5484D; --red-soft:#FCEBEB;
+    --ink-soft:#F1EFEA;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.5;
+  }
+  button{font-family:inherit}
+  input,textarea{font-family:inherit;color:var(--ink)}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:40;
+    background:rgba(247,246,242,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--hairline);
+  }
+  .topbar-inner{
+    max-width:1280px;margin:0 auto;padding:13px clamp(16px,4vw,32px);
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .mark{display:inline-flex;gap:3px;align-items:center}
+  .mark i{width:8px;height:8px;border-radius:2.5px;display:inline-block}
+  .mark .m1{background:#8A8A85}.mark .m2{background:var(--amber)}.mark .m3{background:var(--red)}
+  .brand h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+  .brand-sub{font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-top:1px}
+  .topbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .today-label{font-size:12.5px;color:var(--muted);margin-right:4px}
+  .ghost-btn{
+    font-size:12px;padding:5px 11px;border:1px solid var(--hairline-strong);
+    background:var(--card);color:var(--muted);border-radius:7px;cursor:pointer;transition:all .15s;
+  }
+  .ghost-btn:hover{color:var(--ink);border-color:var(--muted)}
+  .ghost-btn.danger:hover{color:var(--red);border-color:var(--red)}
+
+  /* ---------- 看板 ---------- */
+  .board{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:22px;
+    max-width:1280px;margin:0 auto;padding:22px clamp(16px,4vw,32px) 60px;
+    align-items:start;
+  }
+  .pool{--c:#8A8A85;border-top:2px solid var(--c);padding-top:12px;min-width:0;border-radius:2px}
+  .pool-week{--c:var(--amber)}
+  .pool-today{--c:var(--red)}
+  .pool.drop-target{background:color-mix(in srgb,var(--c) 5%,transparent);border-radius:10px;box-shadow:0 0 0 1.5px var(--c)}
+  .pool-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:4px}
+  .pool-name{display:flex;flex-direction:column;min-width:0}
+  .pool-name h2{font-size:15.5px;font-weight:600;letter-spacing:.02em}
+  .pool-en{font-size:10px;letter-spacing:.13em;color:var(--muted);text-transform:uppercase;margin-top:1px}
+  .pool-count{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap;padding-top:2px}
+  .pool-hint{font-size:11px;color:var(--faint);margin-bottom:10px}
+  .pool-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .search{
+    flex:1;min-width:0;font-size:12.5px;padding:5px 10px;border:1px solid var(--hairline-strong);
+    border-radius:7px;background:var(--card);outline:none;color:var(--ink);
+  }
+  .search:focus{border-color:var(--amber)}
+  .chip-btn{
+    font-size:11.5px;padding:4px 9px;border:1px solid var(--hairline-strong);
+    background:var(--card);color:var(--muted);border-radius:99px;cursor:pointer;white-space:nowrap;
+  }
+  .chip-btn:hover{color:var(--ink);border-color:var(--muted)}
+
+  .pool-add{margin-bottom:10px}
+  .pool-add input{
+    width:100%;font-size:13.5px;padding:9px 12px;border:1.5px dashed var(--hairline-strong);
+    border-radius:var(--radius);background:var(--card);outline:none;
+  }
+  .pool-add input:focus{border-style:solid;border-color:var(--amber)}
+  .pool-add input::placeholder,.sub-input::placeholder{color:var(--faint)}
+
+  .list{display:flex;flex-direction:column;gap:8px;min-height:56px}
+  .empty{
+    border:1.5px dashed var(--hairline);border-radius:var(--radius);
+    padding:18px 12px;text-align:center;color:var(--faint);font-size:12.5px;
+  }
+  .drop-ind{height:3px;background:var(--c);border-radius:2px;flex:none;margin:2px 0}
+
+  /* ---------- 任务卡片 ---------- */
+  .card{
+    background:var(--card);border:1px solid var(--hairline);border-radius:var(--radius);
+    padding:10px 12px;transition:border-color .15s,opacity .15s;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  }
+  .card:hover{border-color:var(--hairline-strong)}
+  .card-row{display:flex;gap:8px;align-items:flex-start}
+  .grip{
+    flex:none;cursor:grab;color:var(--faint);padding:3px 2px;margin-top:1px;
+    line-height:0;border-radius:5px;touch-action:none;
+  }
+  .grip:hover{color:var(--muted);background:var(--ink-soft)}
+  .is-dragging-page,.is-dragging-page *{cursor:grabbing!important;user-select:none!important}
+  .card.is-dragging{opacity:.3;border-style:dashed}
+  .card.ghost{
+    position:fixed;z-index:999;pointer-events:none;margin:0;opacity:.96;
+    box-shadow:0 14px 34px rgba(31,35,40,.20);transform:rotate(1.5deg);border-color:var(--hairline-strong);
+  }
+
+  .check{
+    flex:none;width:18px;height:18px;margin-top:2px;padding:0;
+    border:1.5px solid var(--hairline-strong);border-radius:5px;
+    background:transparent;color:transparent;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;transition:all .12s;
+  }
+  .check:hover{border-color:var(--amber)}
+  .check.on{background:var(--amber);border-color:var(--amber);color:#fff}
+  .check.mini{width:15px;height:15px;border-radius:4px;margin-top:3px}
+  .check.is-static{cursor:default}
+  .check.is-static:hover{border-color:var(--hairline-strong)}
+
+  .card-body{flex:1;min-width:0;cursor:pointer}
+  .card-title{font-size:14px;line-height:1.5;word-break:break-word}
+  .card.is-done .card-title{color:var(--faint);text-decoration:line-through;text-decoration-color:var(--faint)}
+  .card-note{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-word}
+  .card-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+  .subs-toggle{
+    font-size:11.5px;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;
+  }
+  .subs-toggle:hover{color:var(--ink)}
+  .chip{font-size:11px;padding:1px 8px;border-radius:99px;line-height:1.7;white-space:nowrap}
+  .chip-today{color:var(--red);background:var(--red-soft)}
+  .chip-week{color:#B07A1E;background:var(--amber-soft)}
+  .chip-done{color:var(--muted);background:var(--ink-soft)}
+  .card-acts{display:flex;gap:1px;flex:none;opacity:0;transition:opacity .15s}
+  .card:hover .card-acts,.card:focus-within .card-acts{opacity:1}
+  @media(hover:none){.card-acts{opacity:1}}
+  .icon-btn{
+    border:none;background:none;color:var(--faint);cursor:pointer;padding:4px;
+    border-radius:5px;line-height:0;
+  }
+  .icon-btn:hover{color:var(--ink);background:var(--ink-soft)}
+
+  .subs{
+    margin-top:9px;padding:2px 0 2px 10px;border-left:2px solid var(--hairline);
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .sub{display:flex;gap:7px;align-items:flex-start}
+  .sub-title{font-size:13px;line-height:1.45;word-break:break-word}
+  .sub-title.is-done{color:var(--faint);text-decoration:line-through}
+  .sub-input{
+    font-size:13px;border:none;outline:none;background:transparent;width:100%;
+    padding:1px 0;border-bottom:1px dashed var(--hairline-strong);margin-top:1px;
+  }
+
+  /* ---------- 编辑弹窗 ---------- */
+  dialog{
+    border:none;border-radius:14px;padding:0;background:var(--card);
+    box-shadow:0 24px 60px rgba(31,35,40,.25);
+  }
+  dialog::backdrop{background:rgba(31,35,40,.35)}
+  .dlg-form{width:min(520px,calc(100vw - 28px));padding:22px 22px 18px;max-height:85vh;overflow:auto}
+  .dlg-form h3{font-size:15.5px;margin-bottom:16px}
+  .fld{display:block;margin-bottom:15px}
+  .fld-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;letter-spacing:.03em}
+  .fld input[type=text],.fld textarea,.f-sub-input{
+    width:100%;font-size:13.5px;padding:8px 11px;border:1px solid var(--hairline-strong);
+    border-radius:8px;outline:none;background:var(--card);
+  }
+  .fld input:focus,.fld textarea:focus,.f-sub-input:focus{border-color:var(--amber)}
+  .fld textarea{resize:vertical;min-height:56px}
+  #f-subs{display:flex;flex-direction:column;gap:7px;margin-bottom:9px}
+  .f-sub{display:flex;gap:6px;align-items:center}
+  .f-sub-input{flex:1;width:auto}
+  .dlg-foot{display:flex;gap:8px;align-items:center;margin-top:6px}
+  .spacer{flex:1}
+  .primary-btn{
+    background:var(--ink);color:#fff;border:none;font-size:13px;
+    padding:8px 18px;border-radius:8px;cursor:pointer;
+  }
+  .primary-btn:hover{background:#33383f}
+
+  /* ---------- 其他 ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(8px);
+    background:var(--ink);color:#fff;font-size:13px;padding:9px 18px;border-radius:99px;
+    opacity:0;pointer-events:none;transition:all .25s;z-index:1000;white-space:nowrap;
+    box-shadow:0 8px 24px rgba(31,35,40,.25);
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .foot-note{
+    text-align:center;font-size:11px;color:var(--faint);padding:0 16px 34px;
+  }
+  @media(pointer:coarse){
+    input:not([type=file]),textarea{font-size:16px}
+    .pool-add input,.search,.sub-input,.f-sub-input{font-size:16px}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"><i class="m1"></i><i class="m2"></i><i class="m3"></i></span>
+      <div>
+        <h1>三层任务池</h1>
+        <div class="brand-sub">Strategic · Week · Today</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="today-label" id="todayLabel"></span>
+      <button class="ghost-btn" id="btnExport" title="将全部数据导出为 JSON 备份文件">导出</button>
+      <button class="ghost-btn" id="btnImport" title="从 JSON 备份恢复数据">导入</button>
+      <button class="ghost-btn danger" id="btnWipe" title="清空全部任务">清空</button>
+    </div>
+  </div>
+</header>
+
+<main class="board" id="board">
+
+  <section class="pool pool-backlog" data-pool="backlog">
+    <header class="pool-head">
+      <div class="pool-name">
+        <h2>战略任务总池</h2>
+        <span class="pool-en">Strategic Backlog · 任务仓库</span>
+      </div>
+      <span class="pool-count" id="cnt-backlog"></span>
+    </header>
+    <p class="pool-hint">中长期任务与子任务的仓库，所有任务的最终归属；任务在周池完成后才显示完成</p>
+    <div class="pool-tools">
+      <input class="search" id="search-backlog" placeholder="搜索标题 / 备注 / 子任务…">
+      <button class="chip-btn" id="btn-hide-done">隐藏已完成</button>
+    </div>
+    <div class="pool-add"><input id="add-backlog" placeholder="＋ 添加任务至总池，回车保存" maxlength="200"></div>
+    <div class="list" id="list-backlog"></div>
+  </section>
+
+  <section class="pool pool-week" data-pool="week">
+    <header class="pool-head">
+      <div class="pool-name">
+        <h2>本周聚焦池</h2>
+        <span class="pool-en">This Week's Focus Pool</span>
+      </div>
+      <span class="pool-count" id="cnt-week"></span>
+    </header>
+    <p class="pool-hint">本周要推进的任务；标注 <b style="color:var(--red);font-weight:500">→ 今日</b> 表示已进入今日列表（出库但保留）</p>
+    <div class="pool-tools">
+      <button class="chip-btn" id="btn-archive-week" hidden>归档已完成</button>
+    </div>
+    <div class="pool-add"><input id="add-week" placeholder="＋ 添加本周聚焦任务，回车保存" maxlength="200"></div>
+    <div class="list" id="list-week"></div>
+  </section>
+
+  <section class="pool pool-today" data-pool="today">
+    <header class="pool-head">
+      <div class="pool-name">
+        <h2>今日动态列表</h2>
+        <span class="pool-en">Today's Dynamic List</span>
+      </div>
+      <span class="pool-count" id="cnt-today"></span>
+    </header>
+    <p class="pool-hint">今天要执行的任务；完成后自动归档回周池（计入今日已完成），未完成次日自动顺延</p>
+    <div class="pool-tools">
+      <span class="chip chip-done" id="today-done-cnt" hidden></span>
+    </div>
+    <div class="pool-add"><input id="add-today" placeholder="＋ 添加今日任务，回车保存" maxlength="200"></div>
+    <div class="list" id="list-today"></div>
+  </section>
+
+</main>
+
+<p class="foot-note">数据仅保存在本机浏览器（localStorage），不上传任何网络 · 建议定期「导出」备份</p>
+
+<dialog id="dlg">
+  <form class="dlg-form" id="editForm" method="dialog">
+    <h3>编辑任务</h3>
+    <label class="fld">
+      <span class="fld-label">标题</span>
+      <input type="text" id="f-title" maxlength="200" required>
+    </label>
+    <label class="fld">
+      <span class="fld-label">备注</span>
+      <textarea id="f-note" rows="2" maxlength="500" placeholder="可选，一句话说明"></textarea>
+    </label>
+    <div class="fld">
+      <span class="fld-label">子任务 <span id="f-subcount"></span></span>
+      <div id="f-subs"></div>
+      <button type="button" class="chip-btn" id="f-addsub">＋ 添加子任务</button>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="ghost-btn danger" id="f-delete">删除任务</button>
+      <span class="spacer"></span>
+      <button type="button" class="ghost-btn" id="f-cancel">取消</button>
+      <button type="submit" class="primary-btn">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="fileInput" accept="application/json,.json" hidden>
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+
+/* ================= 工具 ================= */
+const $  = s => document.querySelector(s);
+const KEY = 'three-layer-task-pool:v1';
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const sameDay = ts => { if (!ts) return false; const d = new Date(ts); return todayStr() === d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+
+const I = {
+  grip: '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><g fill="currentColor"><circle cx="5.5" cy="3.2" r="1.3"/><circle cx="10.5" cy="3.2" r="1.3"/><circle cx="5.5" cy="8" r="1.3"/><circle cx="10.5" cy="8" r="1.3"/><circle cx="5.5" cy="12.8" r="1.3"/><circle cx="10.5" cy="12.8" r="1.3"/></g></svg>',
+  check: '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M3 8.6l3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pen: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M10.9 2.9l2.2 2.2-7.6 7.6-2.9.7.7-2.9z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
+  x: '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+};
+
+let toastTimer = 0;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ================= 数据 ================= */
+let state;
+const expanded = new Set();   // 展开子任务的卡片 id
+
+function seedState() {
+  const mk = (title, note, subs, week, today) => ({
+    id: uid(), title, note, subtasks: subs.map(([t, d]) => ({ id: uid(), title: t, done: !!d })),
+    done: false, doneAt: null, inWeek: !!week, inToday: !!today, createdAt: Date.now()
+  });
+  const a = mk('阅读《计算机网络》第 3 章', '重点：可靠传输与滑动窗口', [['TCP 滑动窗口', 1], ['超时重传机制'], ['流量控制与拥塞控制']], false, false);
+  const b = mk('完成课程设计开题报告', '', [['查资料', 1], ['写开题文档'], ['找导师签字']], true, false);
+  const c = mk('复习英语听力 30 分钟', '每日打卡', [], true, true);
+  return { tasks: [a, b, c], weekOrder: [b.id, c.id], todayOrder: [c.id], lastDay: todayStr(), hideDone: false };
+}
+
+function normalize(s) {
+  if (!s || !Array.isArray(s.tasks)) return null;
+  const tasks = s.tasks.filter(t => t && typeof t.title === 'string').map(t => ({
+    id: String(t.id || uid()), title: t.title, note: String(t.note || ''),
+    subtasks: Array.isArray(t.subtasks)
+      ? t.subtasks.filter(x => x && typeof x.title === 'string')
+          .map(x => ({ id: String(x.id || uid()), title: x.title, done: !!x.done }))
+      : [],
+    done: !!t.done, doneAt: t.doneAt || null,
+    inWeek: !!t.inWeek, inToday: !!t.inToday, createdAt: t.createdAt || Date.now()
+  }));
+  const ids = new Set(tasks.map(t => t.id));
+  const clean = a => (Array.isArray(a) ? a.map(String).filter(x => ids.has(x)) : []);
+  return {
+    tasks, weekOrder: clean(s.weekOrder), todayOrder: clean(s.todayOrder),
+    lastDay: todayStr(), hideDone: !!s.hideDone
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { const s = normalize(JSON.parse(raw)); if (s) return s; }
+  } catch (_) { /* 数据损坏则回到示例 */ }
+  return seedState();
+}
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch (_) { toast('保存失败：浏览器本地存储不可用'); }
+}
+
+const getTask = id => state.tasks.find(t => t.id === id);
+
+/* 跨天：清理今日列表里已完成的任务（未完成自动顺延） */
+function dayRoll() {
+  const today = todayStr();
+  if (state.lastDay !== today) {
+    state.todayOrder = state.todayOrder.filter(id => { const t = getTask(id); return t && !t.done; });
+    state.lastDay = today;
+    save();
+  }
+}
+
+/* ================= 渲染 ================= */
+function poolTasks(pool) {
+  if (pool === 'backlog') return state.tasks.slice();
+  const ord = pool === 'week' ? state.weekOrder : state.todayOrder;
+  return ord.map(getTask).filter(Boolean);
+}
+
+function emptyHTML(pool) {
+  const map = {
+    backlog: '暂无任务 · 在上方输入后回车新增',
+    week: '从战略总池拖入本周要聚焦的任务',
+    today: '从本周聚焦池拖入今日要执行的任务'
+  };
+  return `<div class="empty">${map[pool]}</div>`;
+}
+
+function cardHTML(t, pool) {
+  const subs = t.subtasks || [];
+  const subsDone = subs.filter(s => s.done).length;
+  const open = expanded.has(t.id);
+
+  const chips = [];
+  if (pool === 'backlog') {
+    if (t.done) chips.push('<span class="chip chip-done">已完成</span>');
+    else if (t.inToday) chips.push('<span class="chip chip-today">→ 今日</span>');
+    else if (t.inWeek) chips.push('<span class="chip chip-week">→ 本周</span>');
+  } else if (pool === 'week' && t.inToday && !t.done) {
+    chips.push('<span class="chip chip-today">→ 今日</span>');
+  }
+
+  const check = pool === 'backlog'
+    ? `<span class="check is-static${t.done ? ' on' : ''}" title="任务在周池完成后才显示完成">${I.check}</span>`
+    : `<button class="check${t.done ? ' on' : ''}" data-act="toggle" title="${t.done ? '取消完成' : '标记完成'}">${I.check}</button>`;
+
+  const subsToggle = subs.length
+    ? `<button class="subs-toggle" data-act="expand">${open ? '▾' : '▸'} 子任务 ${subsDone}/${subs.length}</button>` : '';
+
+  const subsList = (subs.length && open) ? `<div class="subs">${
+    subs.map(s => `
+      <div class="sub">
+        <button class="check mini${s.done ? ' on' : ''}" data-act="sub" data-sid="${s.id}" title="${s.done ? '取消' : '完成'}">${I.check}</button>
+        <span class="sub-title${s.done ? ' is-done' : ''}">${esc(s.title)}</span>
+      </div>`).join('')
+    }<input class="sub-input" placeholder="＋ 新增子任务，回车保存" maxlength="200"></div>` : '';
+
+  return `<article class="card${t.done ? ' is-done' : ''}" data-id="${t.id}">
+    <div class="card-row">
+      <span class="grip" title="按住拖拽到其他池">${I.grip}</span>
+      ${check}
+      <div class="card-body" data-act="edit">
+        <div class="card-title">${esc(t.title)}</div>
+        ${t.note ? `<div class="card-note">${esc(t.note)}</div>` : ''}
+        ${(chips.length || subsToggle) ? `<div class="card-meta">${chips.join('')}${subsToggle}</div>` : ''}
+      </div>
+      <div class="card-acts">
+        <button class="icon-btn" data-act="edit" title="编辑">${I.pen}</button>
+        <button class="icon-btn" data-act="del" title="删除">${I.x}</button>
+      </div>
+    </div>${subsList}
+  </article>`;
+}
+
+function renderPool(pool) {
+  const list = $('#list-' + pool);
+  let ts = poolTasks(pool);
+
+  if (pool === 'backlog') {
+    const q = ($('#search-backlog').value || '').trim().toLowerCase();
+    if (q) ts = ts.filter(t =>
+      t.title.toLowerCase().includes(q) ||
+      (t.note || '').toLowerCase().includes(q) ||
+      t.subtasks.some(s => s.title.toLowerCase().includes(q)));
+    if (state.hideDone) ts = ts.filter(t => !t.done);
+  }
+
+  list.innerHTML = ts.length ? ts.map(t => cardHTML(t, pool)).join('') : emptyHTML(pool);
+
+  if (pool === 'backlog') {
+    const undone = state.tasks.filter(t => !t.done).length;
+    $('#cnt-backlog').textContent = `${state.tasks.length} 项 · 未完成 ${undone}`;
+    $('#btn-hide-done').textContent = state.hideDone ? '显示已完成' : '隐藏已完成';
+  }
+  if (pool === 'week') {
+    const week = poolTasks('week');
+    $('#cnt-week').textContent = `${week.length} 项`;
+    $('#btn-archive-week').hidden = !week.some(t => t.done);
+  }
+  if (pool === 'today') {
+    const undone = poolTasks('today').filter(t => !t.done).length;
+    $('#cnt-today').textContent = `${undone} 项`;
+    const doneCnt = state.tasks.filter(t => t.done && sameDay(t.doneAt)).length;
+    const chip = $('#today-done-cnt');
+    chip.hidden = !doneCnt;
+    chip.textContent = `今日已完成 ${doneCnt}`;
+  }
+}
+
+function render() {
+  renderPool('backlog'); renderPool('week'); renderPool('today');
+}
+
+/* ================= 操作 ================= */
+function addTask(pool, title) {
+  const t = {
+    id: uid(), title, note: '', subtasks: [],
+    done: false, doneAt: null, inWeek: false, inToday: false, createdAt: Date.now()
+  };
+  if (pool === 'week') { t.inWeek = true; state.weekOrder.unshift(t.id); }
+  if (pool === 'today') {
+    t.inToday = true; t.inWeek = true;
+    state.weekOrder.unshift(t.id); state.todayOrder.unshift(t.id);
+  }
+  state.tasks.unshift(t);
+  save(); render();
+}
+
+function toggleDone(t) {
+  t.done = !t.done;
+  if (t.done) {
+    t.doneAt = Date.now();
+    /* 今日列表中完成 → 自动归档回周池（出库） */
+    state.todayOrder = state.todayOrder.filter(x => x !== t.id);
+    t.inToday = false;
+  } else {
+    t.doneAt = null;
+  }
+  save(); render();
+}
+
+function delTask(t) {
+  const subs = t.subtasks.length ? `（含 ${t.subtasks.length} 个子任务）` : '';
+  if (!confirm(`删除任务「${t.title}」${subs}？此操作不可恢复。`)) return;
+  state.tasks = state.tasks.filter(x => x.id !== t.id);
+  state.weekOrder = state.weekOrder.filter(x => x !== t.id);
+  state.todayOrder = state.todayOrder.filter(x => x !== t.id);
+  expanded.delete(t.id);
+  save(); render();
+  toast('已删除');
+}
+
+function insertIntoOrder(ord, id, index) {
+  const i = ord.indexOf(id);
+  if (i > -1) ord.splice(i, 1);
+  ord.splice(Math.min(index, ord.length), 0, id);
+}
+
+/**
+ * 跨池移动 / 池内排序。
+ * fromPool/toPool: backlog | week | today；index 基于目标池“可见列表”（不含被拖卡片）；
+ * dispIds 为目标池可见卡片的 id 序列（用于总池被搜索/过滤时的定位）。
+ */
+function applyMove(fromPool, id, toPool, index, dispIds) {
+  const t = getTask(id);
+  if (!t) return;
+
+  if (toPool === 'backlog') {
+    t.inWeek = false; t.inToday = false;
+    state.weekOrder = state.weekOrder.filter(x => x !== id);
+    state.todayOrder = state.todayOrder.filter(x => x !== id);
+  } else if (toPool === 'week') {
+    t.inToday = false;                              /* 今日 → 周：未完成返回，箭头消失 */
+    state.todayOrder = state.todayOrder.filter(x => x !== id);
+    t.inWeek = true;
+    insertIntoOrder(state.weekOrder, id, index);
+  } else { /* today */
+    t.inToday = true;
+    if (!t.inWeek) { t.inWeek = true; state.weekOrder.push(id); }
+    insertIntoOrder(state.todayOrder, id, index);
+  }
+
+  /* 总池（tasks 数组）顺序仅在涉及 backlog 时调整 */
+  if (fromPool === 'backlog' || toPool === 'backlog') {
+    const arr = state.tasks;
+    const from = arr.findIndex(x => x.id === id);
+    const moving = from > -1 ? arr.splice(from, 1)[0] : t;
+    let pos = arr.length;
+    if (dispIds && dispIds.length) {
+      if (index >= dispIds.length) {
+        const a = arr.findIndex(x => x.id === dispIds[dispIds.length - 1]);
+        pos = a > -1 ? a + 1 : arr.length;
+      } else {
+        const a = arr.findIndex(x => x.id === dispIds[index]);
+        pos = a > -1 ? a : arr.length;
+      }
+    }
+    arr.splice(pos, 0, moving);
+  }
+}
+
+/* ================= 事件：点击 / 回车 ================= */
+const board = $('#board');
+
+board.addEventListener('click', e => {
+  if (e.target.closest('input,textarea')) return;
+  const actEl = e.target.closest('[data-act]');
+  if (!actEl) return;
+  const card = e.target.closest('.card');
+  const act = actEl.dataset.act;
+
+  if (act === 'edit') { if (card) openEdit(card.dataset.id); return; }
+  if (!card) return;
+  const t = getTask(card.dataset.id);
+  if (!t) return;
+
+  if (act === 'toggle') toggleDone(t);
+  else if (act === 'sub') {
+    const s = t.subtasks.find(x => x.id === actEl.dataset.sid);
+    if (s) { s.done = !s.done; save(); render(); }
+  }
+  else if (act === 'expand') { expanded.has(t.id) ? expanded.delete(t.id) : expanded.add(t.id); render(); }
+  else if (act === 'del') delTask(t);
+});
+
+/* 卡片内快速新增子任务 */
+board.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const inp = e.target.closest('.sub-input');
+  if (!inp) return;
+  e.preventDefault();
+  const card = e.target.closest('.card');
+  const t = card && getTask(card.dataset.id);
+  if (!t) return;
+  const v = inp.value.trim();
+  if (!v) return;
+  t.subtasks.push({ id: uid(), title: v, done: false });
+  expanded.add(t.id);
+  save(); render();
+  const poolEl = e.target.closest('.pool');
+  const next = poolEl && poolEl.querySelector(`.card[data-id="${t.id}"] .sub-input`);
+  if (next) next.focus();
+});
+
+/* 三个池的快速添加 */
+['backlog', 'week', 'today'].forEach(p => {
+  const inp = $('#add-' + p);
+  inp.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const v = inp.value.trim();
+    if (!v) return;
+    addTask(p, v);
+    inp.value = '';
+  });
+});
+
+$('#search-backlog').addEventListener('input', () => renderPool('backlog'));
+$('#btn-hide-done').addEventListener('click', () => { state.hideDone = !state.hideDone; save(); renderPool('backlog'); });
+$('#btn-archive-week').addEventListener('click', () => {
+  state.weekOrder = state.weekOrder.filter(id => { const t = getTask(id); return t && !t.done; });
+  save(); render();
+  toast('已完成任务已归档回总池');
+});
+
+/* ================= 拖拽（Pointer Events，桌面 / 触屏通用） ================= */
+let drag = null;
+const IND = document.createElement('div');
+IND.className = 'drop-ind';
+
+board.addEventListener('contextmenu', e => { if (e.target.closest('.grip')) e.preventDefault(); });
+
+board.addEventListener('pointerdown', e => {
+  const grip = e.target.closest('.grip');
+  if (!grip) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const card = grip.closest('.card');
+  const poolEl = grip.closest('.pool');
+  if (!card || !poolEl) return;
+  drag = {
+    id: card.dataset.id, fromPool: poolEl.dataset.pool, card, pid: e.pointerId,
+    sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY,
+    started: false, target: null, lastPoolEl: null, ghost: null, raf: 0, ox: 0, oy: 0
+  };
+  try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+  e.preventDefault();
+});
+
+board.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (!drag.started) {
+    if (Math.hypot(drag.x - drag.sx, drag.y - drag.sy) < 6) return;
+    startDragVisual();
+  }
+  updateDrag();
+});
+
+board.addEventListener('pointerup', e => { if (drag && e.pointerId === drag.pid) finishDrag(true); });
+board.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.pid) finishDrag(false); });
+
+function startDragVisual() {
+  drag.started = true;
+  const r = drag.card.getBoundingClientRect();
+  drag.ox = drag.sx - r.left;
+  drag.oy = drag.sy - r.top;
+  const g = drag.card.cloneNode(true);
+  g.classList.add('ghost');
+  g.style.width = r.width + 'px';
+  document.body.appendChild(g);
+  drag.ghost = g;
+  drag.card.classList.add('is-dragging');
+  document.body.classList.add('is-dragging-page');
+  const step = () => {
+    if (!drag || !drag.started) return;
+    autoScroll();
+    drag.raf = requestAnimationFrame(step);
+  };
+  drag.raf = requestAnimationFrame(step);
+}
+
+function autoScroll() {
+  const m = 80, s = 16;
+  if (drag.y < m) window.scrollBy(0, -s * (1 - drag.y / m));
+  else if (drag.y > innerHeight - m) window.scrollBy(0, s * (1 - (innerHeight - drag.y) / m));
+}
+
+function updateDrag() {
+  if (drag.ghost) {
+    drag.ghost.style.left = (drag.x - drag.ox) + 'px';
+    drag.ghost.style.top = (drag.y - drag.oy) + 'px';
+  }
+  const el = document.elementFromPoint(drag.x, drag.y);
+  const poolEl = el ? el.closest('.pool') : null;
+  if (drag.lastPoolEl && drag.lastPoolEl !== poolEl) drag.lastPoolEl.classList.remove('drop-target');
+  IND.remove();
+  if (!poolEl) { drag.lastPoolEl = null; drag.target = null; return; }
+  poolEl.classList.add('drop-target');
+  drag.lastPoolEl = poolEl;
+
+  const list = poolEl.querySelector('.list');
+  const cards = [...list.querySelectorAll(':scope > .card:not(.is-dragging)')];
+  let idx = cards.length;
+  for (let i = 0; i < cards.length; i++) {
+    const b = cards[i].getBoundingClientRect();
+    if (drag.y < b.top + b.height / 2) { idx = i; break; }
+  }
+  if (idx < cards.length) list.insertBefore(IND, cards[idx]);
+  else list.appendChild(IND);
+  drag.target = { pool: poolEl.dataset.pool, index: idx, ids: cards.map(c => c.dataset.id) };
+}
+
+function finishDrag(commit) {
+  if (drag.raf) cancelAnimationFrame(drag.raf);
+  if (drag.started) {
+    if (commit && drag.target) {
+      applyMove(drag.fromPool, drag.id, drag.target.pool, drag.target.index, drag.target.ids);
+      save();
+    }
+    render();
+  }
+  if (drag.ghost) drag.ghost.remove();
+  IND.remove();
+  if (drag.lastPoolEl) drag.lastPoolEl.classList.remove('drop-target');
+  drag.card.classList.remove('is-dragging');
+  document.body.classList.remove('is-dragging-page');
+  drag = null;
+}
+
+/* ================= 编辑弹窗 ================= */
+const dlg = $('#dlg');
+let editingId = null;
+let subsDraft = [];
+
+function openEdit(id) {
+  const t = getTask(id);
+  if (!t) return;
+  editingId = id;
+  $('#f-title').value = t.title;
+  $('#f-note').value = t.note || '';
+  subsDraft = (t.subtasks || []).map(s => ({ id: s.id, title: s.title, done: s.done }));
+  renderSubDraft();
+  dlg.showModal();
+}
+
+function renderSubDraft() {
+  $('#f-subs').innerHTML = subsDraft.map((s, i) => `
+    <div class="f-sub" data-i="${i}">
+      <input class="f-sub-input" value="${esc(s.title)}" placeholder="子任务内容" maxlength="200">
+      <button type="button" class="icon-btn" data-del="${i}" title="移除">${I.x}</button>
+    </div>`).join('');
+  $('#f-subcount').textContent = subsDraft.length ? `（${subsDraft.length}）` : '';
+}
+
+$('#f-subs').addEventListener('input', e => {
+  const row = e.target.closest('.f-sub');
+  if (row) subsDraft[+row.dataset.i].title = e.target.value;
+});
+$('#f-subs').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]');
+  if (b) { subsDraft.splice(+b.dataset.del, 1); renderSubDraft(); }
+});
+$('#f-addsub').addEventListener('click', () => {
+  subsDraft.push({ id: uid(), title: '', done: false });
+  renderSubDraft();
+  const rows = $('#f-subs').querySelectorAll('.f-sub-input');
+  if (rows.length) rows[rows.length - 1].focus();
+});
+
+$('#editForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const t = getTask(editingId);
+  if (!t) { dlg.close(); return; }
+  const title = $('#f-title').value.trim();
+  if (!title) { $('#f-title').focus(); return; }
+  t.title = title;
+  t.note = $('#f-note').value.trim();
+  t.subtasks = subsDraft.filter(s => s.title.trim()).map(s => ({ id: s.id, title: s.title.trim(), done: !!s.done }));
+  save(); render(); dlg.close();
+});
+$('#f-cancel').addEventListener('click', () => dlg.close());
+$('#f-delete').addEventListener('click', () => { const t = getTask(editingId); dlg.close(); if (t) delTask(t); });
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+/* ================= 导出 / 导入 / 清空 ================= */
+$('#btnExport').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `三层任务池备份-${todayStr()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  toast('已导出备份文件');
+});
+
+$('#btnImport').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const s = normalize(JSON.parse(reader.result));
+      if (!s) throw new Error('bad');
+      if (!confirm(`导入将覆盖当前全部数据（现有 ${state.tasks.length} 项任务），确定继续？`)) return;
+      state = s;
+      save(); render();
+      toast(`已导入 ${state.tasks.length} 项任务`);
+    } catch (_) { toast('导入失败：文件格式不正确'); }
+  };
+  reader.readAsText(file);
+});
+
+$('#btnWipe').addEventListener('click', () => {
+  if (!confirm('确定清空所有任务吗？此操作不可恢复，建议先「导出」备份。')) return;
+  state = { tasks: [], weekOrder: [], todayOrder: [], lastDay: todayStr(), hideDone: false };
+  save(); render();
+  toast('已清空');
+});
+
+/* ================= 启动 ================= */
+(function boot() {
+  state = loadState();
+  dayRoll();
+  const d = new Date();
+  $('#todayLabel').textContent = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 · 周${'日一二三四五六'[d.getDay()]}`;
+  render();
+})();
+</script>
+</body>
+</html>
