@@ -31,7 +31,7 @@
     border-bottom:1px solid var(--hairline);
   }
   .topbar-inner{
-    max-width:1280px;margin:0 auto;padding:13px clamp(16px,4vw,32px);
+    max-width:860px;margin:0 auto;padding:13px clamp(14px,4vw,32px);
     display:flex;align-items:center;gap:12px;flex-wrap:wrap;
   }
   .brand{display:flex;align-items:center;gap:10px}
@@ -49,22 +49,44 @@
   .ghost-btn:hover{color:var(--ink);border-color:var(--muted)}
   .ghost-btn.danger:hover{color:var(--red);border-color:var(--red)}
 
-  /* ---------- 看板 ---------- */
+  /* ---------- 手风琴看板 ---------- */
   .board{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:22px;
-    max-width:1280px;margin:0 auto;padding:22px clamp(16px,4vw,32px) 60px;
-    align-items:start;
+    display:flex;flex-direction:column;gap:12px;
+    max-width:860px;margin:0 auto;padding:18px clamp(14px,4vw,32px) 60px;
   }
-  .pool{--c:#8A8A85;border-top:2px solid var(--c);padding-top:12px;min-width:0;border-radius:2px}
+  .pool{--c:#8A8A85}
   .pool-week{--c:var(--amber)}
   .pool-today{--c:var(--red)}
-  .pool.drop-target{background:color-mix(in srgb,var(--c) 5%,transparent);border-radius:10px;box-shadow:0 0 0 1.5px var(--c)}
-  .pool-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:4px}
-  .pool-name{display:flex;flex-direction:column;min-width:0}
-  .pool-name h2{font-size:15.5px;font-weight:600;letter-spacing:.02em}
-  .pool-en{font-size:10px;letter-spacing:.13em;color:var(--muted);text-transform:uppercase;margin-top:1px}
-  .pool-count{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap;padding-top:2px}
-  .pool-hint{font-size:11px;color:var(--faint);margin-bottom:10px}
+
+  .pool-bar{
+    display:flex;align-items:center;gap:10px;width:100%;min-height:48px;
+    padding:10px 14px;cursor:pointer;text-align:left;
+    background:var(--card);border:1px solid var(--hairline);border-left:3px solid var(--c);
+    border-radius:var(--radius);color:var(--ink);transition:border-color .15s;
+  }
+  .pool-bar:hover{border-color:var(--hairline-strong)}
+  .pool.open .pool-bar{border-bottom-left-radius:0;border-bottom-right-radius:0}
+  .chev{flex:none;width:12px;color:var(--muted);font-size:12px;transition:transform .18s}
+  .pool.open .chev{transform:rotate(90deg)}
+  .bar-mark{flex:none;width:8px;height:8px;border-radius:2.5px;background:var(--c)}
+  .bar-title{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .bar-title em{font-style:normal;font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-left:8px}
+  .bar-count{margin-left:auto;flex:none;font-size:12px;color:var(--muted);white-space:nowrap}
+  .pool.drop-target .pool-bar{
+    box-shadow:0 0 0 1.5px var(--c);
+    background:color-mix(in srgb,var(--c) 5%,var(--card));
+  }
+
+  .pool-body{
+    display:none;background:var(--card);
+    border:1px solid var(--hairline);border-top:none;
+    border-radius:0 0 var(--radius) var(--radius);
+    padding:2px 14px 14px;
+  }
+  .pool.open .pool-body{display:block;animation:poolOpen .18s ease}
+  @keyframes poolOpen{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+  .pool-hint{font-size:11px;color:var(--faint);margin:8px 0 10px}
   .pool-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
   .search{
     flex:1;min-width:0;font-size:12.5px;padding:5px 10px;border:1px solid var(--hairline-strong);
@@ -120,9 +142,7 @@
   }
   .check:hover{border-color:var(--amber)}
   .check.on{background:var(--amber);border-color:var(--amber);color:#fff}
-  .check.mini{width:15px;height:15px;border-radius:4px;margin-top:3px}
-  .check.is-static{cursor:default}
-  .check.is-static:hover{border-color:var(--hairline-strong)}
+  .check.mini{width:15px;height:15px;border-radius:4px;margin-top:2px}
 
   .card-body{flex:1;min-width:0;cursor:pointer}
   .card-title{font-size:14px;line-height:1.5;word-break:break-word}
@@ -146,25 +166,54 @@
   }
   .icon-btn:hover{color:var(--ink);background:var(--ink-soft)}
 
+  /* ---------- 子任务（父卡片内） ---------- */
   .subs{
-    margin-top:9px;padding:2px 0 2px 10px;border-left:2px solid var(--hairline);
+    margin-top:9px;padding:2px 0 2px 4px;border-left:2px solid var(--hairline);
     display:flex;flex-direction:column;gap:6px;
   }
-  .sub{display:flex;gap:7px;align-items:flex-start}
+  .sub{display:flex;gap:7px;align-items:flex-start;transition:opacity .15s}
+  .sub.is-dragging{opacity:.3}
+  .sub-grip{
+    flex:none;cursor:grab;color:var(--faint);padding:3px 2px;margin-top:1px;
+    line-height:0;border-radius:5px;touch-action:none;
+  }
+  .sub-grip:hover{color:var(--muted);background:var(--ink-soft)}
+  .sub-grip svg{width:11px;height:11px}
+  .sub-num{flex:none;min-width:15px;text-align:right;font-size:12px;color:var(--faint);margin-top:2px;font-variant-numeric:tabular-nums}
   .sub-title{font-size:13px;line-height:1.45;word-break:break-word}
   .sub-title.is-done{color:var(--faint);text-decoration:line-through}
+  .sub-chip{font-size:10px;padding:0 7px;line-height:1.8;margin-top:1px}
   .sub-input{
     font-size:13px;border:none;outline:none;background:transparent;width:100%;
     padding:1px 0;border-bottom:1px dashed var(--hairline-strong);margin-top:1px;
   }
+  .ghost-sub{
+    position:fixed;z-index:999;pointer-events:none;margin:0;
+    background:var(--card);border:1px solid var(--hairline-strong);border-radius:var(--radius);
+    padding:10px 12px;box-shadow:0 14px 34px rgba(31,35,40,.20);transform:rotate(1.5deg);
+  }
+  .ghost-parent{
+    font-size:11px;color:var(--muted);margin-bottom:7px;padding-bottom:6px;
+    border-bottom:1px dashed var(--hairline);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
 
-  /* ---------- 编辑弹窗 ---------- */
+  /* ---------- 子任务出库条目（池内独立显示） ---------- */
+  .sub-entry{padding:8px 12px}
+  .sub-entry .card-title{font-size:13.5px}
+  .sub-ref{
+    display:inline-block;font-size:11.5px;color:var(--muted);background:var(--ink-soft);
+    padding:0 8px;border-radius:99px;margin-right:8px;white-space:nowrap;vertical-align:1px;
+  }
+  .dlg-sub-ref{font-size:12px;color:var(--muted);font-weight:400;margin-left:6px}
+
+  /* ---------- 编辑弹窗（居中） ---------- */
   dialog{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;
     border:none;border-radius:14px;padding:0;background:var(--card);
     box-shadow:0 24px 60px rgba(31,35,40,.25);
   }
   dialog::backdrop{background:rgba(31,35,40,.35)}
-  .dlg-form{width:min(520px,calc(100vw - 28px));padding:22px 22px 18px;max-height:85vh;overflow:auto}
+  .dlg-form{width:min(520px,calc(100vw - 24px));padding:22px 22px 18px;max-height:85vh;overflow:auto}
   .dlg-form h3{font-size:15.5px;margin-bottom:16px}
   .fld{display:block;margin-bottom:15px}
   .fld-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;letter-spacing:.03em}
@@ -176,8 +225,9 @@
   .fld textarea{resize:vertical;min-height:56px}
   #f-subs{display:flex;flex-direction:column;gap:7px;margin-bottom:9px}
   .f-sub{display:flex;gap:6px;align-items:center}
+  .f-sub-num{flex:none;min-width:16px;text-align:right;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
   .f-sub-input{flex:1;width:auto}
-  .dlg-foot{display:flex;gap:8px;align-items:center;margin-top:6px}
+  .dlg-foot{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
   .spacer{flex:1}
   .primary-btn{
     background:var(--ink);color:#fff;border:none;font-size:13px;
@@ -193,8 +243,13 @@
     box-shadow:0 8px 24px rgba(31,35,40,.25);
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .foot-note{
-    text-align:center;font-size:11px;color:var(--faint);padding:0 16px 34px;
+  .foot-note{text-align:center;font-size:11px;color:var(--faint);padding:0 16px 34px}
+
+  @media(max-width:600px){
+    .bar-title em{display:none}
+    .pool-bar{padding:12px}
+    .bar-count{font-size:11px}
+    .topbar-actions{gap:6px}
   }
   @media(pointer:coarse){
     input:not([type=file]),textarea{font-size:16px}
@@ -225,52 +280,55 @@
 <main class="board" id="board">
 
   <section class="pool pool-backlog" data-pool="backlog">
-    <header class="pool-head">
-      <div class="pool-name">
-        <h2>战略任务总池</h2>
-        <span class="pool-en">Strategic Backlog · 任务仓库</span>
+    <button class="pool-bar" type="button" aria-expanded="false">
+      <span class="chev" aria-hidden="true">▸</span>
+      <span class="bar-mark" aria-hidden="true"></span>
+      <span class="bar-title">战略任务总池 <em>Strategic Backlog</em></span>
+      <span class="bar-count" id="bar-cnt-backlog"></span>
+    </button>
+    <div class="pool-body">
+      <p class="pool-hint">中长期任务与嵌套子任务的仓库，所有任务的最终归属；勾选任务 = 全部子任务一并完成，子任务全部完成时任务自动标记完成</p>
+      <div class="pool-tools">
+        <input class="search" id="search-backlog" placeholder="搜索标题 / 备注 / 子任务…">
+        <button class="chip-btn" id="btn-hide-done">隐藏已完成</button>
       </div>
-      <span class="pool-count" id="cnt-backlog"></span>
-    </header>
-    <p class="pool-hint">中长期任务与子任务的仓库，所有任务的最终归属；任务在周池完成后才显示完成</p>
-    <div class="pool-tools">
-      <input class="search" id="search-backlog" placeholder="搜索标题 / 备注 / 子任务…">
-      <button class="chip-btn" id="btn-hide-done">隐藏已完成</button>
+      <div class="pool-add"><input id="add-backlog" placeholder="＋ 添加任务至总池，回车保存" maxlength="200"></div>
+      <div class="list" id="list-backlog"></div>
     </div>
-    <div class="pool-add"><input id="add-backlog" placeholder="＋ 添加任务至总池，回车保存" maxlength="200"></div>
-    <div class="list" id="list-backlog"></div>
   </section>
 
   <section class="pool pool-week" data-pool="week">
-    <header class="pool-head">
-      <div class="pool-name">
-        <h2>本周聚焦池</h2>
-        <span class="pool-en">This Week's Focus Pool</span>
+    <button class="pool-bar" type="button" aria-expanded="false">
+      <span class="chev" aria-hidden="true">▸</span>
+      <span class="bar-mark" aria-hidden="true"></span>
+      <span class="bar-title">本周聚焦池 <em>This Week's Focus</em></span>
+      <span class="bar-count" id="bar-cnt-week"></span>
+    </button>
+    <div class="pool-body">
+      <p class="pool-hint">本周要推进的任务；标注 <b style="color:var(--red);font-weight:500">→ 今日</b> 表示已进入今日列表（出库但保留）。拖子任务到本池可将其单独取出，显示为「主任务.编号」</p>
+      <div class="pool-tools">
+        <button class="chip-btn" id="btn-archive-week" hidden>归档已完成</button>
       </div>
-      <span class="pool-count" id="cnt-week"></span>
-    </header>
-    <p class="pool-hint">本周要推进的任务；标注 <b style="color:var(--red);font-weight:500">→ 今日</b> 表示已进入今日列表（出库但保留）</p>
-    <div class="pool-tools">
-      <button class="chip-btn" id="btn-archive-week" hidden>归档已完成</button>
+      <div class="pool-add"><input id="add-week" placeholder="＋ 添加本周聚焦任务，回车保存" maxlength="200"></div>
+      <div class="list" id="list-week"></div>
     </div>
-    <div class="pool-add"><input id="add-week" placeholder="＋ 添加本周聚焦任务，回车保存" maxlength="200"></div>
-    <div class="list" id="list-week"></div>
   </section>
 
   <section class="pool pool-today" data-pool="today">
-    <header class="pool-head">
-      <div class="pool-name">
-        <h2>今日动态列表</h2>
-        <span class="pool-en">Today's Dynamic List</span>
+    <button class="pool-bar" type="button" aria-expanded="false">
+      <span class="chev" aria-hidden="true">▸</span>
+      <span class="bar-mark" aria-hidden="true"></span>
+      <span class="bar-title">今日动态列表 <em>Today's Dynamic List</em></span>
+      <span class="bar-count" id="bar-cnt-today"></span>
+    </button>
+    <div class="pool-body">
+      <p class="pool-hint">今天要执行的任务；完成后自动归档回周池（计入今日已完成），未完成次日自动顺延</p>
+      <div class="pool-tools">
+        <span class="chip chip-done" id="today-done-cnt" hidden></span>
       </div>
-      <span class="pool-count" id="cnt-today"></span>
-    </header>
-    <p class="pool-hint">今天要执行的任务；完成后自动归档回周池（计入今日已完成），未完成次日自动顺延</p>
-    <div class="pool-tools">
-      <span class="chip chip-done" id="today-done-cnt" hidden></span>
+      <div class="pool-add"><input id="add-today" placeholder="＋ 添加今日任务，回车保存" maxlength="200"></div>
+      <div class="list" id="list-today"></div>
     </div>
-    <div class="pool-add"><input id="add-today" placeholder="＋ 添加今日任务，回车保存" maxlength="200"></div>
-    <div class="list" id="list-today"></div>
   </section>
 
 </main>
@@ -302,6 +360,23 @@
   </form>
 </dialog>
 
+<dialog id="subDlg">
+  <form class="dlg-form" id="subEditForm" method="dialog">
+    <h3>编辑子任务<span class="dlg-sub-ref" id="fs-ref"></span></h3>
+    <label class="fld">
+      <span class="fld-label">内容</span>
+      <input type="text" id="fs-title" maxlength="200" required>
+    </label>
+    <div class="dlg-foot">
+      <button type="button" class="ghost-btn danger" id="fs-delete">删除子任务</button>
+      <span class="spacer"></span>
+      <button type="button" class="ghost-btn" id="fs-checkin" title="从各池移出，保留为主任务的子任务">收回总池</button>
+      <button type="button" class="ghost-btn" id="fs-cancel">取消</button>
+      <button type="submit" class="primary-btn">保存</button>
+    </div>
+  </form>
+</dialog>
+
 <input type="file" id="fileInput" accept="application/json,.json" hidden>
 <div id="toast" role="status"></div>
 
@@ -310,11 +385,13 @@
 
 /* ================= 工具 ================= */
 const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const KEY = 'three-layer-task-pool:v1';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
 const sameDay = ts => { if (!ts) return false; const d = new Date(ts); return todayStr() === d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const pull = (arr, v) => { const i = arr.indexOf(v); if (i > -1) arr.splice(i, 1); };
 
 const I = {
   grip: '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><g fill="currentColor"><circle cx="5.5" cy="3.2" r="1.3"/><circle cx="10.5" cy="3.2" r="1.3"/><circle cx="5.5" cy="8" r="1.3"/><circle cx="10.5" cy="8" r="1.3"/><circle cx="5.5" cy="12.8" r="1.3"/><circle cx="10.5" cy="12.8" r="1.3"/></g></svg>',
@@ -338,13 +415,16 @@ const expanded = new Set();   // 展开子任务的卡片 id
 
 function seedState() {
   const mk = (title, note, subs, week, today) => ({
-    id: uid(), title, note, subtasks: subs.map(([t, d]) => ({ id: uid(), title: t, done: !!d })),
+    id: uid(), title, note, subtasks: subs.map(([t, d]) => ({ id: uid(), title: t, done: !!d, doneAt: null, inWeek: false, inToday: false })),
     done: false, doneAt: null, inWeek: !!week, inToday: !!today, createdAt: Date.now()
   });
   const a = mk('阅读《计算机网络》第 3 章', '重点：可靠传输与滑动窗口', [['TCP 滑动窗口', 1], ['超时重传机制'], ['流量控制与拥塞控制']], false, false);
   const b = mk('完成课程设计开题报告', '', [['查资料', 1], ['写开题文档'], ['找导师签字']], true, false);
   const c = mk('复习英语听力 30 分钟', '每日打卡', [], true, true);
-  return { tasks: [a, b, c], weekOrder: [b.id, c.id], todayOrder: [c.id], lastDay: todayStr(), hideDone: false };
+  return {
+    tasks: [a, b, c], weekOrder: [b.id, c.id], todayOrder: [c.id],
+    weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false
+  };
 }
 
 function normalize(s) {
@@ -353,15 +433,23 @@ function normalize(s) {
     id: String(t.id || uid()), title: t.title, note: String(t.note || ''),
     subtasks: Array.isArray(t.subtasks)
       ? t.subtasks.filter(x => x && typeof x.title === 'string')
-          .map(x => ({ id: String(x.id || uid()), title: x.title, done: !!x.done }))
+          .map(x => ({
+            id: String(x.id || uid()), title: x.title, done: !!x.done,
+            doneAt: x.doneAt || null, inWeek: !!x.inWeek, inToday: !!x.inToday
+          }))
       : [],
     done: !!t.done, doneAt: t.doneAt || null,
     inWeek: !!t.inWeek, inToday: !!t.inToday, createdAt: t.createdAt || Date.now()
   }));
   const ids = new Set(tasks.map(t => t.id));
+  const subIds = new Set();
+  tasks.forEach(t => t.subtasks.forEach(x => subIds.add(x.id)));
   const clean = a => (Array.isArray(a) ? a.map(String).filter(x => ids.has(x)) : []);
+  const cleanSub = a => (Array.isArray(a) ? a.map(String).filter(x => subIds.has(x)) : []);
   return {
-    tasks, weekOrder: clean(s.weekOrder), todayOrder: clean(s.todayOrder),
+    tasks,
+    weekOrder: clean(s.weekOrder), todayOrder: clean(s.todayOrder),
+    weekSubOrder: cleanSub(s.weekSubOrder), todaySubOrder: cleanSub(s.todaySubOrder),
     lastDay: todayStr(), hideDone: !!s.hideDone
   };
 }
@@ -380,15 +468,31 @@ function save() {
 }
 
 const getTask = id => state.tasks.find(t => t.id === id);
+function getSub(subId) {
+  for (const t of state.tasks) {
+    const s = t.subtasks.find(x => x.id === subId);
+    if (s) return { task: t, sub: s };
+  }
+  return null;
+}
+const subNum = (task, sub) => task.subtasks.findIndex(s => s.id === sub.id) + 1;
 
-/* 跨天：清理今日列表里已完成的任务（未完成自动顺延） */
+/* 跨天：清理今日列表里已完成的任务与子任务（未完成自动顺延） */
 function dayRoll() {
   const today = todayStr();
   if (state.lastDay !== today) {
     state.todayOrder = state.todayOrder.filter(id => { const t = getTask(id); return t && !t.done; });
+    state.todaySubOrder = state.todaySubOrder.filter(id => { const f = getSub(id); return f && !f.sub.done; });
     state.lastDay = today;
     save();
   }
+}
+
+/* ================= 池子的展开 / 折叠 ================= */
+function setPoolOpen(poolEl, open) {
+  poolEl.classList.toggle('open', !!open);
+  const bar = poolEl.querySelector('.pool-bar');
+  if (bar) bar.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 /* ================= 渲染 ================= */
@@ -397,12 +501,16 @@ function poolTasks(pool) {
   const ord = pool === 'week' ? state.weekOrder : state.todayOrder;
   return ord.map(getTask).filter(Boolean);
 }
+function poolSubIds(pool) {
+  if (pool === 'backlog') return [];
+  return pool === 'week' ? state.weekSubOrder : state.todaySubOrder;
+}
 
 function emptyHTML(pool) {
   const map = {
     backlog: '暂无任务 · 在上方输入后回车新增',
-    week: '从战略总池拖入本周要聚焦的任务',
-    today: '从本周聚焦池拖入今日要执行的任务'
+    week: '从战略总池拖入任务，或把某个子任务单独拖进来',
+    today: '从本周聚焦池拖入任务或子任务'
   };
   return `<div class="empty">${map[pool]}</div>`;
 }
@@ -421,19 +529,25 @@ function cardHTML(t, pool) {
     chips.push('<span class="chip chip-today">→ 今日</span>');
   }
 
-  const check = pool === 'backlog'
-    ? `<span class="check is-static${t.done ? ' on' : ''}" title="任务在周池完成后才显示完成">${I.check}</span>`
-    : `<button class="check${t.done ? ' on' : ''}" data-act="toggle" title="${t.done ? '取消完成' : '标记完成'}">${I.check}</button>`;
+  const check = `<button class="check${t.done ? ' on' : ''}" data-act="toggle" title="${t.done ? '取消完成' : '标记完成'}">${I.check}</button>`;
 
   const subsToggle = subs.length
     ? `<button class="subs-toggle" data-act="expand">${open ? '▾' : '▸'} 子任务 ${subsDone}/${subs.length}</button>` : '';
 
   const subsList = (subs.length && open) ? `<div class="subs">${
-    subs.map(s => `
-      <div class="sub">
+    subs.map((s, i) => {
+      let chip = '';
+      if (!s.done && s.inToday) chip = '<span class="chip chip-today sub-chip">→ 今日</span>';
+      else if (!s.done && s.inWeek) chip = '<span class="chip chip-week sub-chip">→ 本周</span>';
+      return `
+      <div class="sub" data-sid="${s.id}">
+        <span class="sub-grip" title="拖动排序；拖到其他池=单独取出该子任务">${I.grip}</span>
         <button class="check mini${s.done ? ' on' : ''}" data-act="sub" data-sid="${s.id}" title="${s.done ? '取消' : '完成'}">${I.check}</button>
+        <span class="sub-num">${i + 1}.</span>
         <span class="sub-title${s.done ? ' is-done' : ''}">${esc(s.title)}</span>
-      </div>`).join('')
+        ${chip}
+      </div>`;
+    }).join('')
     }<input class="sub-input" placeholder="＋ 新增子任务，回车保存" maxlength="200"></div>` : '';
 
   return `<article class="card${t.done ? ' is-done' : ''}" data-id="${t.id}">
@@ -453,6 +567,24 @@ function cardHTML(t, pool) {
   </article>`;
 }
 
+/** 出库子任务在池内的独立条目：显示为「主任务.编号」+ 子任务内容 */
+function subEntryHTML(task, sub, pool) {
+  const num = subNum(task, sub);
+  return `<article class="card sub-entry${sub.done ? ' is-done' : ''}" data-sub="${sub.id}" data-task="${task.id}">
+    <div class="card-row">
+      <span class="grip" title="拖动：池内排序 / 拖到其他池移动；拖回总池=收回">${I.grip}</span>
+      <button class="check mini${sub.done ? ' on' : ''}" data-act="sub" data-sid="${sub.id}" title="${sub.done ? '取消' : '完成'}">${I.check}</button>
+      <div class="card-body" data-act="subedit" data-sid="${sub.id}">
+        <div class="card-title"><span class="sub-ref">${esc(task.title)}.${num}</span>${esc(sub.title)}</div>
+      </div>
+      <div class="card-acts">
+        <button class="icon-btn" data-act="subedit" data-sid="${sub.id}" title="编辑此子任务">${I.pen}</button>
+        <button class="icon-btn" data-act="checkin" data-sid="${sub.id}" title="收回（仅从池中移出，保留在主任务内）">${I.x}</button>
+      </div>
+    </div>
+  </article>`;
+}
+
 function renderPool(pool) {
   const list = $('#list-' + pool);
   let ts = poolTasks(pool);
@@ -466,22 +598,33 @@ function renderPool(pool) {
     if (state.hideDone) ts = ts.filter(t => !t.done);
   }
 
-  list.innerHTML = ts.length ? ts.map(t => cardHTML(t, pool)).join('') : emptyHTML(pool);
+  const taskCards = ts.map(t => cardHTML(t, pool)).join('');
+  const entryCards = poolSubIds(pool).map(sid => {
+    const f = getSub(sid);
+    return f ? subEntryHTML(f.task, f.sub, pool) : '';
+  }).join('');
+
+  list.innerHTML = (taskCards || entryCards) ? taskCards + entryCards : emptyHTML(pool);
 
   if (pool === 'backlog') {
     const undone = state.tasks.filter(t => !t.done).length;
-    $('#cnt-backlog').textContent = `${state.tasks.length} 项 · 未完成 ${undone}`;
+    $('#bar-cnt-backlog').textContent = `${state.tasks.length} 项 · 未完成 ${undone}`;
     $('#btn-hide-done').textContent = state.hideDone ? '显示已完成' : '隐藏已完成';
   }
   if (pool === 'week') {
     const week = poolTasks('week');
-    $('#cnt-week').textContent = `${week.length} 项`;
-    $('#btn-archive-week').hidden = !week.some(t => t.done);
+    const subs = state.weekSubOrder.map(getSub).filter(Boolean);
+    const doneN = week.filter(t => t.done).length + subs.filter(f => f.sub.done).length;
+    const subN = subs.length;
+    $('#bar-cnt-week').textContent = `${week.length} 项${subN ? ` + ${subN} 子` : ''}${doneN ? ` · ${doneN} 已完成` : ''}`;
+    $('#btn-archive-week').hidden = !doneN;
   }
   if (pool === 'today') {
-    const undone = poolTasks('today').filter(t => !t.done).length;
-    $('#cnt-today').textContent = `${undone} 项`;
-    const doneCnt = state.tasks.filter(t => t.done && sameDay(t.doneAt)).length;
+    const undone = poolTasks('today').filter(t => !t.done).length +
+      state.todaySubOrder.map(getSub).filter(Boolean).filter(f => !f.sub.done).length;
+    const doneCnt = state.tasks.reduce((n, t) => n + (t.done && sameDay(t.doneAt) ? 1 : 0), 0) +
+      state.tasks.reduce((n, t) => n + t.subtasks.reduce((m, s) => m + (s.done && sameDay(s.doneAt) ? 1 : 0), 0), 0);
+    $('#bar-cnt-today').textContent = `${undone} 项${doneCnt ? ` · 今日完成 ${doneCnt}` : ''}`;
     const chip = $('#today-done-cnt');
     chip.hidden = !doneCnt;
     chip.textContent = `今日已完成 ${doneCnt}`;
@@ -507,38 +650,108 @@ function addTask(pool, title) {
   save(); render();
 }
 
+/** 标记任务完成：级联完成全部子任务（含出库到各池的条目），并从今日归档 */
+function completeTask(t) {
+  t.done = true;
+  t.doneAt = Date.now();
+  /* 今日列表中完成 → 自动归档回周池（出库） */
+  pull(state.todayOrder, t.id);
+  t.inToday = false;
+  t.subtasks.forEach(s => {
+    if (!s.done) {
+      s.done = true;
+      s.doneAt = Date.now();
+      if (s.inToday) { s.inToday = false; pull(state.todaySubOrder, s.id); }
+    }
+  });
+}
+
 function toggleDone(t) {
-  t.done = !t.done;
-  if (t.done) {
-    t.doneAt = Date.now();
-    /* 今日列表中完成 → 自动归档回周池（出库） */
-    state.todayOrder = state.todayOrder.filter(x => x !== t.id);
-    t.inToday = false;
+  if (!t.done) {
+    completeTask(t);            /* 勾选主任务 = 全部子任务一并完成 */
   } else {
+    t.done = false;             /* 取消完成：保留各子任务的完成状态 */
     t.doneAt = null;
   }
   save(); render();
+}
+
+/** 勾选子任务（父卡片内 / 池内条目 均走这里）；今日完成自动出库；
+    子任务全部完成 → 任务自动完成；已完成任务中取消子任务 → 任务恢复未完成 */
+function toggleSub(task, sub) {
+  sub.done = !sub.done;
+  if (sub.done) {
+    sub.doneAt = Date.now();
+    if (sub.inToday) { sub.inToday = false; pull(state.todaySubOrder, sub.id); }
+    if (!task.done && task.subtasks.length && task.subtasks.every(s => s.done)) {
+      completeTask(task);
+      toast('子任务已全部完成 · 任务自动标记完成');
+    }
+  } else {
+    sub.doneAt = null;
+    if (task.done) {
+      task.done = false;
+      task.doneAt = null;
+      toast('子任务未全部完成 · 任务恢复为未完成');
+    }
+  }
+  save(); render();
+}
+
+/** 收回出库的子任务（从各池移出，保留为主任务的子任务） */
+function checkInSub(sub) {
+  const changed = sub.inWeek || sub.inToday;
+  sub.inWeek = false; sub.inToday = false;
+  pull(state.weekSubOrder, sub.id);
+  pull(state.todaySubOrder, sub.id);
+  return changed;
+}
+
+/** 子任务拖到某个池：单独出库为该池条目（不移动主任务） */
+function applySubPoolMove(sub, toPool, index) {
+  if (toPool === 'backlog') {
+    return checkInSub(sub);          /* 拖回总池 = 收回 */
+  }
+  if (toPool === 'week') {
+    if (sub.inToday) { sub.inToday = false; pull(state.todaySubOrder, sub.id); }
+    sub.inWeek = true;
+    insertIntoOrder(state.weekSubOrder, sub.id, index);
+  } else { /* today */
+    sub.inToday = true;
+    if (!sub.inWeek) { sub.inWeek = true; state.weekSubOrder.push(sub.id); }
+    insertIntoOrder(state.todaySubOrder, sub.id, index);
+  }
+  return true;
 }
 
 function delTask(t) {
   const subs = t.subtasks.length ? `（含 ${t.subtasks.length} 个子任务）` : '';
   if (!confirm(`删除任务「${t.title}」${subs}？此操作不可恢复。`)) return;
   state.tasks = state.tasks.filter(x => x.id !== t.id);
-  state.weekOrder = state.weekOrder.filter(x => x !== t.id);
-  state.todayOrder = state.todayOrder.filter(x => x !== t.id);
+  pull(state.weekOrder, t.id);
+  pull(state.todayOrder, t.id);
+  t.subtasks.forEach(s => { pull(state.weekSubOrder, s.id); pull(state.todaySubOrder, s.id); });
   expanded.delete(t.id);
   save(); render();
   toast('已删除');
 }
 
 function insertIntoOrder(ord, id, index) {
-  const i = ord.indexOf(id);
-  if (i > -1) ord.splice(i, 1);
+  pull(ord, id);
   ord.splice(Math.min(index, ord.length), 0, id);
 }
 
+/** 子任务在其所属任务内重新排序（index 基于可见子任务行，不含被拖行） */
+function applySubMove(task, subId, index) {
+  const subs = task.subtasks;
+  const from = subs.findIndex(s => s.id === subId);
+  if (from < 0) return;
+  const moving = subs.splice(from, 1)[0];
+  subs.splice(Math.min(index, subs.length), 0, moving);
+}
+
 /**
- * 跨池移动 / 池内排序。
+ * 任务跨池移动 / 池内排序。
  * fromPool/toPool: backlog | week | today；index 基于目标池“可见列表”（不含被拖卡片）；
  * dispIds 为目标池可见卡片的 id 序列（用于总池被搜索/过滤时的定位）。
  */
@@ -548,11 +761,11 @@ function applyMove(fromPool, id, toPool, index, dispIds) {
 
   if (toPool === 'backlog') {
     t.inWeek = false; t.inToday = false;
-    state.weekOrder = state.weekOrder.filter(x => x !== id);
-    state.todayOrder = state.todayOrder.filter(x => x !== id);
+    pull(state.weekOrder, id);
+    pull(state.todayOrder, id);
   } else if (toPool === 'week') {
     t.inToday = false;                              /* 今日 → 周：未完成返回，箭头消失 */
-    state.todayOrder = state.todayOrder.filter(x => x !== id);
+    pull(state.todayOrder, id);
     t.inWeek = true;
     insertIntoOrder(state.weekOrder, id, index);
   } else { /* today */
@@ -583,6 +796,16 @@ function applyMove(fromPool, id, toPool, index, dispIds) {
 /* ================= 事件：点击 / 回车 ================= */
 const board = $('#board');
 
+/* 折叠栏点击展开/收起 */
+board.addEventListener('click', e => {
+  const bar = e.target.closest('.pool-bar');
+  if (bar) {
+    const pool = bar.closest('.pool');
+    setPoolOpen(pool, !pool.classList.contains('open'));
+    return;
+  }
+});
+
 board.addEventListener('click', e => {
   if (e.target.closest('input,textarea')) return;
   const actEl = e.target.closest('[data-act]');
@@ -591,15 +814,23 @@ board.addEventListener('click', e => {
   const act = actEl.dataset.act;
 
   if (act === 'edit') { if (card) openEdit(card.dataset.id); return; }
+  if (act === 'subedit') { openSubEdit(actEl.dataset.sid); return; }
   if (!card) return;
+
+  if (act === 'sub') {
+    const f = getSub(actEl.dataset.sid);
+    if (f) toggleSub(f.task, f.sub);
+    return;
+  }
+  if (act === 'checkin') {
+    const f = getSub(actEl.dataset.sid);
+    if (f) { checkInSub(f.sub); save(); render(); toast('已收回主任务'); }
+    return;
+  }
+
   const t = getTask(card.dataset.id);
   if (!t) return;
-
   if (act === 'toggle') toggleDone(t);
-  else if (act === 'sub') {
-    const s = t.subtasks.find(x => x.id === actEl.dataset.sid);
-    if (s) { s.done = !s.done; save(); render(); }
-  }
   else if (act === 'expand') { expanded.has(t.id) ? expanded.delete(t.id) : expanded.add(t.id); render(); }
   else if (act === 'del') delTask(t);
 });
@@ -615,7 +846,7 @@ board.addEventListener('keydown', e => {
   if (!t) return;
   const v = inp.value.trim();
   if (!v) return;
-  t.subtasks.push({ id: uid(), title: v, done: false });
+  t.subtasks.push({ id: uid(), title: v, done: false, doneAt: null, inWeek: false, inToday: false });
   expanded.add(t.id);
   save(); render();
   const poolEl = e.target.closest('.pool');
@@ -639,31 +870,48 @@ $('#search-backlog').addEventListener('input', () => renderPool('backlog'));
 $('#btn-hide-done').addEventListener('click', () => { state.hideDone = !state.hideDone; save(); renderPool('backlog'); });
 $('#btn-archive-week').addEventListener('click', () => {
   state.weekOrder = state.weekOrder.filter(id => { const t = getTask(id); return t && !t.done; });
+  state.weekSubOrder = state.weekSubOrder.filter(id => { const f = getSub(id); return f && !f.sub.done; });
   save(); render();
-  toast('已完成任务已归档回总池');
+  toast('已完成条目已归档回总池');
 });
 
-/* ================= 拖拽（Pointer Events，桌面 / 触屏通用） ================= */
+/* ================= 拖拽（Pointer Events，桌面 / 触屏通用）
+   三种拖拽：整卡（跨池移动）、子任务行（排序 / 单独出库）、出库条目（池间移动） ================= */
 let drag = null;
 const IND = document.createElement('div');
 IND.className = 'drop-ind';
 
-board.addEventListener('contextmenu', e => { if (e.target.closest('.grip')) e.preventDefault(); });
+board.addEventListener('contextmenu', e => { if (e.target.closest('.grip,.sub-grip')) e.preventDefault(); });
 
 board.addEventListener('pointerdown', e => {
-  const grip = e.target.closest('.grip');
-  if (!grip) return;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  const card = grip.closest('.card');
-  const poolEl = grip.closest('.pool');
+  const gripEl = e.target.closest('.grip,.sub-grip');
+  if (!gripEl) return;
+  const card = gripEl.closest('.card');
+  const poolEl = gripEl.closest('.pool');
   if (!card || !poolEl) return;
-  drag = {
-    id: card.dataset.id, fromPool: poolEl.dataset.pool, card, pid: e.pointerId,
-    sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY,
-    started: false, target: null, lastPoolEl: null, ghost: null, raf: 0, ox: 0, oy: 0
-  };
-  try { grip.setPointerCapture(e.pointerId); } catch (_) {}
   e.preventDefault();
+  try { gripEl.setPointerCapture(e.pointerId); } catch (_) {}
+
+  const base = {
+    pid: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY,
+    started: false, target: null, lastPoolEl: null, ghost: null, raf: 0, ox: 0, oy: 0,
+    expandTimer: 0, expandPoolEl: null, fromPool: poolEl.dataset.pool
+  };
+
+  if (gripEl.classList.contains('sub-grip')) {
+    /* 父卡片内的子任务行 */
+    const row = gripEl.closest('.sub');
+    if (!row) return;
+    const f = getSub(row.dataset.sid);
+    drag = { ...base, kind: 'sub', entry: false, subId: row.dataset.sid, taskId: card.dataset.id,
+             card: row, num: f ? subNum(f.task, f.sub) : 0 };
+  } else if (card.classList.contains('sub-entry')) {
+    /* 池内出库条目 */
+    drag = { ...base, kind: 'sub', entry: true, subId: card.dataset.sub, taskId: card.dataset.task, card };
+  } else {
+    drag = { ...base, kind: 'task', id: card.dataset.id, card };
+  }
 });
 
 board.addEventListener('pointermove', e => {
@@ -684,11 +932,27 @@ function startDragVisual() {
   const r = drag.card.getBoundingClientRect();
   drag.ox = drag.sx - r.left;
   drag.oy = drag.sy - r.top;
-  const g = drag.card.cloneNode(true);
-  g.classList.add('ghost');
-  g.style.width = r.width + 'px';
-  document.body.appendChild(g);
-  drag.ghost = g;
+
+  if (drag.kind === 'sub' && !drag.entry) {
+    /* 行拖拽浮层：显示「主任务.编号」，明确拖的是哪个子任务 */
+    const wrap = document.createElement('div');
+    wrap.className = 'ghost-sub';
+    const parent = getTask(drag.taskId);
+    wrap.innerHTML = `<div class="ghost-parent">所属：${esc(parent ? parent.title : '')}.${drag.num || '·'}</div>`;
+    const clone = drag.card.cloneNode(true);
+    clone.classList.remove('is-dragging');
+    wrap.appendChild(clone);
+    wrap.style.width = Math.max(180, Math.min(r.width + 24, 340)) + 'px';
+    document.body.appendChild(wrap);
+    drag.ghost = wrap;
+  } else {
+    const g = drag.card.cloneNode(true);
+    g.classList.add('ghost');
+    g.style.width = r.width + 'px';
+    document.body.appendChild(g);
+    drag.ghost = g;
+  }
+
   drag.card.classList.add('is-dragging');
   document.body.classList.add('is-dragging-page');
   const step = () => {
@@ -705,37 +969,135 @@ function autoScroll() {
   else if (drag.y > innerHeight - m) window.scrollBy(0, s * (1 - (innerHeight - drag.y) / m));
 }
 
+function clearExpandTimer() {
+  clearTimeout(drag.expandTimer);
+  drag.expandPoolEl = null;
+}
+
+function setHoverPool(poolEl) {
+  if (drag.lastPoolEl && drag.lastPoolEl !== poolEl) drag.lastPoolEl.classList.remove('drop-target');
+  drag.lastPoolEl = poolEl;
+  if (poolEl) poolEl.classList.add('drop-target');
+}
+
+/* 悬停折叠栏约 0.5s 自动展开 */
+function maybeAutoExpand(poolEl) {
+  if (!poolEl.classList.contains('open')) {
+    if (drag.expandPoolEl !== poolEl) {
+      clearExpandTimer();
+      drag.expandPoolEl = poolEl;
+      drag.expandTimer = setTimeout(() => { if (drag) setPoolOpen(poolEl, true); }, 500);
+    }
+  } else {
+    clearExpandTimer();
+  }
+}
+
+/* 在池列表中按锚点卡片计算插入位置；placeInd 决定指示线落点 */
+function computeDrop(list, anchors) {
+  let idx = anchors.length;
+  for (let i = 0; i < anchors.length; i++) {
+    const b = anchors[i].getBoundingClientRect();
+    if (drag.y < b.top + b.height / 2) { idx = i; break; }
+  }
+  if (idx < anchors.length) list.insertBefore(IND, anchors[idx]);
+  else if (anchors.length) list.insertBefore(IND, anchors[anchors.length - 1].nextSibling);
+  else list.appendChild(IND);
+  return idx;
+}
+
+/* 任务投放目标：锚点为普通任务卡（排除出库条目与自身副本） */
+function poolTargetFor(el, taskId) {
+  const poolEl = el ? el.closest('.pool') : null;
+  setHoverPool(poolEl);
+  IND.remove();
+  if (!poolEl) { drag.target = null; clearExpandTimer(); return; }
+  maybeAutoExpand(poolEl);
+
+  const list = poolEl.querySelector('.list');
+  const cards = [...list.querySelectorAll(':scope > .card')]
+    .filter(c => !c.classList.contains('sub-entry') && !c.classList.contains('is-dragging') && c.dataset.id !== taskId);
+  const idx = computeDrop(list, cards);
+  drag.target = { type: 'pool', pool: poolEl.dataset.pool, index: idx, ids: cards.map(c => c.dataset.id) };
+}
+
+/* 子任务投放目标：锚点为出库条目（排除自身在各池的条目副本） */
+function subPoolTargetFor(el, subId) {
+  const poolEl = el ? el.closest('.pool') : null;
+  setHoverPool(poolEl);
+  IND.remove();
+  if (!poolEl) { drag.target = null; clearExpandTimer(); return; }
+  maybeAutoExpand(poolEl);
+
+  const list = poolEl.querySelector('.list');
+  const entries = [...list.querySelectorAll(':scope > .card.sub-entry')]
+    .filter(c => !c.classList.contains('is-dragging') && c.dataset.sub !== subId);
+  const idx = computeDrop(list, entries);
+  drag.target = { type: 'pool', pool: poolEl.dataset.pool, index: idx, sub: true };
+}
+
 function updateDrag() {
   if (drag.ghost) {
     drag.ghost.style.left = (drag.x - drag.ox) + 'px';
     drag.ghost.style.top = (drag.y - drag.oy) + 'px';
   }
   const el = document.elementFromPoint(drag.x, drag.y);
-  const poolEl = el ? el.closest('.pool') : null;
-  if (drag.lastPoolEl && drag.lastPoolEl !== poolEl) drag.lastPoolEl.classList.remove('drop-target');
-  IND.remove();
-  if (!poolEl) { drag.lastPoolEl = null; drag.target = null; return; }
-  poolEl.classList.add('drop-target');
-  drag.lastPoolEl = poolEl;
+  const cardEl = el ? el.closest('.card') : null;
 
-  const list = poolEl.querySelector('.list');
-  const cards = [...list.querySelectorAll(':scope > .card:not(.is-dragging)')];
-  let idx = cards.length;
-  for (let i = 0; i < cards.length; i++) {
-    const b = cards[i].getBoundingClientRect();
-    if (drag.y < b.top + b.height / 2) { idx = i; break; }
+  if (drag.kind === 'sub') {
+    /* ① 悬停在同一任务的子任务列表内 → 子任务排序（放回父卡片同时收回出库） */
+    if (cardEl && cardEl.dataset.id === drag.taskId) {
+      const subsEl = el.closest('.subs');
+      if (subsEl) {
+        setHoverPool(null);
+        IND.remove();
+        clearExpandTimer();
+        const rows = [...subsEl.querySelectorAll(':scope > .sub:not(.is-dragging)')];
+        let idx = rows.length;
+        for (let i = 0; i < rows.length; i++) {
+          const b = rows[i].getBoundingClientRect();
+          if (drag.y < b.top + b.height / 2) { idx = i; break; }
+        }
+        const inputEl = subsEl.querySelector(':scope > .sub-input');
+        if (idx < rows.length) subsEl.insertBefore(IND, rows[idx]);
+        else if (inputEl) subsEl.insertBefore(IND, inputEl);
+        else subsEl.appendChild(IND);
+        drag.target = { type: 'sub', index: idx };
+        return;
+      }
+    }
+    /* ② 悬停到池 → 子任务单独出库到该池（不移动主任务）；拖回总池=收回 */
+    subPoolTargetFor(el, drag.subId);
+    return;
   }
-  if (idx < cards.length) list.insertBefore(IND, cards[idx]);
-  else list.appendChild(IND);
-  drag.target = { pool: poolEl.dataset.pool, index: idx, ids: cards.map(c => c.dataset.id) };
+
+  /* ---- 任务拖拽 ---- */
+  poolTargetFor(el, drag.id);
 }
 
 function finishDrag(commit) {
   if (drag.raf) cancelAnimationFrame(drag.raf);
+  clearTimeout(drag.expandTimer);
   if (drag.started) {
     if (commit && drag.target) {
-      applyMove(drag.fromPool, drag.id, drag.target.pool, drag.target.index, drag.target.ids);
-      save();
+      if (drag.target.type === 'sub') {
+        const f = getSub(drag.subId);
+        if (f) {
+          applySubMove(f.task, drag.subId, drag.target.index);
+          if (f.sub.inWeek || f.sub.inToday) { checkInSub(f.sub); toast('已收回主任务'); }
+          save();
+        }
+      } else if (drag.kind === 'sub') {
+        /* 子任务拖到池：单独出库为该池条目（主任务不动）；拖回总池=收回 */
+        const f = getSub(drag.subId);
+        if (f) {
+          applySubPoolMove(f.sub, drag.target.pool, drag.target.index);
+          save();
+        }
+      } else {
+        applyMove(drag.fromPool, drag.id, drag.target.pool, drag.target.index, drag.target.ids);
+        save();
+      }
     }
     render();
   }
@@ -747,7 +1109,7 @@ function finishDrag(commit) {
   drag = null;
 }
 
-/* ================= 编辑弹窗 ================= */
+/* ================= 任务编辑弹窗 ================= */
 const dlg = $('#dlg');
 let editingId = null;
 let subsDraft = [];
@@ -766,6 +1128,7 @@ function openEdit(id) {
 function renderSubDraft() {
   $('#f-subs').innerHTML = subsDraft.map((s, i) => `
     <div class="f-sub" data-i="${i}">
+      <span class="f-sub-num">${i + 1}.</span>
       <input class="f-sub-input" value="${esc(s.title)}" placeholder="子任务内容" maxlength="200">
       <button type="button" class="icon-btn" data-del="${i}" title="移除">${I.x}</button>
     </div>`).join('');
@@ -795,12 +1158,56 @@ $('#editForm').addEventListener('submit', e => {
   if (!title) { $('#f-title').focus(); return; }
   t.title = title;
   t.note = $('#f-note').value.trim();
+  const removed = t.subtasks.filter(s => !subsDraft.some(d => d.id === s.id)).map(s => s.id);
+  removed.forEach(sid => { pull(state.weekSubOrder, sid); pull(state.todaySubOrder, sid); });
   t.subtasks = subsDraft.filter(s => s.title.trim()).map(s => ({ id: s.id, title: s.title.trim(), done: !!s.done }));
   save(); render(); dlg.close();
 });
 $('#f-cancel').addEventListener('click', () => dlg.close());
 $('#f-delete').addEventListener('click', () => { const t = getTask(editingId); dlg.close(); if (t) delTask(t); });
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+/* ================= 子任务编辑弹窗（只编辑该子任务本身） ================= */
+const subDlg = $('#subDlg');
+let editingSubId = null;
+
+function openSubEdit(subId) {
+  const f = getSub(subId);
+  if (!f) return;
+  editingSubId = subId;
+  $('#fs-ref').textContent = `${f.task.title}.${subNum(f.task, f.sub)}`;
+  $('#fs-title').value = f.sub.title;
+  subDlg.showModal();
+}
+
+$('#subEditForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = getSub(editingSubId);
+  if (!f) { subDlg.close(); return; }
+  const v = $('#fs-title').value.trim();
+  if (!v) { $('#fs-title').focus(); return; }
+  f.sub.title = v;
+  save(); render(); subDlg.close();
+});
+$('#fs-cancel').addEventListener('click', () => subDlg.close());
+$('#fs-checkin').addEventListener('click', () => {
+  const f = getSub(editingSubId);
+  subDlg.close();
+  if (!f) return;
+  if (checkInSub(f.sub)) { save(); render(); toast('已收回主任务'); }
+});
+$('#fs-delete').addEventListener('click', () => {
+  const f = getSub(editingSubId);
+  subDlg.close();
+  if (!f) return;
+  if (!confirm(`删除子任务「${f.task.title}.${subNum(f.task, f.sub)} ${f.sub.title}」？`)) return;
+  f.task.subtasks = f.task.subtasks.filter(s => s.id !== f.sub.id);
+  pull(state.weekSubOrder, f.sub.id);
+  pull(state.todaySubOrder, f.sub.id);
+  save(); render();
+  toast('已删除子任务');
+});
+subDlg.addEventListener('click', e => { if (e.target === subDlg) subDlg.close(); });
 
 /* ================= 导出 / 导入 / 清空 ================= */
 $('#btnExport').addEventListener('click', () => {
@@ -834,7 +1241,7 @@ $('#fileInput').addEventListener('change', e => {
 
 $('#btnWipe').addEventListener('click', () => {
   if (!confirm('确定清空所有任务吗？此操作不可恢复，建议先「导出」备份。')) return;
-  state = { tasks: [], weekOrder: [], todayOrder: [], lastDay: todayStr(), hideDone: false };
+  state = { tasks: [], weekOrder: [], todayOrder: [], weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false };
   save(); render();
   toast('已清空');
 });
@@ -846,6 +1253,8 @@ $('#btnWipe').addEventListener('click', () => {
   const d = new Date();
   $('#todayLabel').textContent = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 · 周${'日一二三四五六'[d.getDay()]}`;
   render();
+  /* 每次打开：仅展开「今日动态列表」，其余折叠等待手动展开 */
+  $$('.pool').forEach(p => setPoolOpen(p, p.dataset.pool === 'today'));
 })();
 </script>
 </body>
