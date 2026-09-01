@@ -157,6 +157,10 @@
   .chip-today{color:var(--red);background:var(--red-soft)}
   .chip-week{color:#B07A1E;background:var(--amber-soft)}
   .chip-done{color:var(--muted);background:var(--ink-soft)}
+  .due-white{color:var(--muted);background:#fff;border:1px solid var(--hairline-strong)}
+  .due-blue{color:#2563EB;background:#EAF1FE}
+  .due-yellow{color:#B07A1E;background:var(--amber-soft)}
+  .due-red{color:var(--red);background:var(--red-soft)}
   .card-acts{display:flex;gap:1px;flex:none;opacity:0;transition:opacity .15s}
   .card:hover .card-acts,.card:focus-within .card-acts{opacity:1}
   @media(hover:none){.card-acts{opacity:1}}
@@ -217,7 +221,7 @@
   .dlg-form h3{font-size:15.5px;margin-bottom:16px}
   .fld{display:block;margin-bottom:15px}
   .fld-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;letter-spacing:.03em}
-  .fld input[type=text],.fld textarea,.f-sub-input{
+  .fld input[type=text],.fld input[type=date],.fld textarea,.f-sub-input{
     width:100%;font-size:13.5px;padding:8px 11px;border:1px solid var(--hairline-strong);
     border-radius:8px;outline:none;background:var(--card);
   }
@@ -305,7 +309,7 @@
       <span class="bar-count" id="bar-cnt-week"></span>
     </button>
     <div class="pool-body">
-      <p class="pool-hint">本周要推进的任务；标注 <b style="color:var(--red);font-weight:500">→ 今日</b> 表示已进入今日列表（出库但保留）。拖子任务到本池可将其单独取出，显示为「主任务.编号」</p>
+      <p class="pool-hint">本周要推进的任务；标注 <b style="color:var(--red);font-weight:500">→ 今日</b> 表示已进入今日列表（出库但保留）。拖子任务到本池可将其单独取出，显示为「主任务.编号」；未完成的任务会一直留在本池，不会自动退回总池</p>
       <div class="pool-tools">
         <button class="chip-btn" id="btn-archive-week" hidden>归档已完成</button>
       </div>
@@ -322,9 +326,10 @@
       <span class="bar-count" id="bar-cnt-today"></span>
     </button>
     <div class="pool-body">
-      <p class="pool-hint">今天要执行的任务；完成后自动归档回周池（计入今日已完成），未完成次日自动顺延</p>
+      <p class="pool-hint">今天要执行的任务；完成的任务划线保留到零点自动隐藏（计入今日已完成，也可手动隐藏），未完成的零点自动返回周池</p>
       <div class="pool-tools">
         <span class="chip chip-done" id="today-done-cnt" hidden></span>
+        <button class="chip-btn" id="btn-hide-today-done">隐藏已完成</button>
       </div>
       <div class="pool-add"><input id="add-today" placeholder="＋ 添加今日任务，回车保存" maxlength="200"></div>
       <div class="list" id="list-today"></div>
@@ -345,6 +350,10 @@
     <label class="fld">
       <span class="fld-label">备注</span>
       <textarea id="f-note" rows="2" maxlength="500" placeholder="可选，一句话说明"></textarea>
+    </label>
+    <label class="fld">
+      <span class="fld-label">截止日期</span>
+      <input type="date" id="f-due">
     </label>
     <div class="fld">
       <span class="fld-label">子任务 <span id="f-subcount"></span></span>
@@ -390,6 +399,7 @@ const KEY = 'three-layer-task-pool:v1';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const plusDays = n => { const d = new Date(Date.now() + n * 86400000); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
 const sameDay = ts => { if (!ts) return false; const d = new Date(ts); return todayStr() === d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
 const pull = (arr, v) => { const i = arr.indexOf(v); if (i > -1) arr.splice(i, 1); };
 
@@ -416,14 +426,16 @@ const expanded = new Set();   // 展开子任务的卡片 id
 function seedState() {
   const mk = (title, note, subs, week, today) => ({
     id: uid(), title, note, subtasks: subs.map(([t, d]) => ({ id: uid(), title: t, done: !!d, doneAt: null, inWeek: false, inToday: false })),
-    done: false, doneAt: null, inWeek: !!week, inToday: !!today, createdAt: Date.now()
+    done: false, doneAt: null, due: null, inWeek: !!week, inToday: !!today, createdAt: Date.now()
   });
   const a = mk('阅读《计算机网络》第 3 章', '重点：可靠传输与滑动窗口', [['TCP 滑动窗口', 1], ['超时重传机制'], ['流量控制与拥塞控制']], false, false);
   const b = mk('完成课程设计开题报告', '', [['查资料', 1], ['写开题文档'], ['找导师签字']], true, false);
   const c = mk('复习英语听力 30 分钟', '每日打卡', [], true, true);
+  a.due = plusDays(2);   /* 示例：临期显示黄色 */
+  b.due = plusDays(6);   /* 示例：一周内显示蓝色 */
   return {
     tasks: [a, b, c], weekOrder: [b.id, c.id], todayOrder: [c.id],
-    weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false
+    weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false, hideTodayDone: false
   };
 }
 
@@ -439,6 +451,7 @@ function normalize(s) {
           }))
       : [],
     done: !!t.done, doneAt: t.doneAt || null,
+    due: (typeof t.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null,
     inWeek: !!t.inWeek, inToday: !!t.inToday, createdAt: t.createdAt || Date.now()
   }));
   const ids = new Set(tasks.map(t => t.id));
@@ -450,7 +463,7 @@ function normalize(s) {
     tasks,
     weekOrder: clean(s.weekOrder), todayOrder: clean(s.todayOrder),
     weekSubOrder: cleanSub(s.weekSubOrder), todaySubOrder: cleanSub(s.todaySubOrder),
-    lastDay: todayStr(), hideDone: !!s.hideDone
+    lastDay: todayStr(), hideDone: !!s.hideDone, hideTodayDone: !!s.hideTodayDone
   };
 }
 
@@ -477,12 +490,27 @@ function getSub(subId) {
 }
 const subNum = (task, sub) => task.subtasks.findIndex(s => s.id === sub.id) + 1;
 
-/* 跨天：清理今日列表里已完成的任务与子任务（未完成自动顺延） */
+/** 截止日期徽标：距离越近颜色越重（白 → 蓝 → 黄 → 红），已完成不显示 */
+function dueChip(t) {
+  if (!t.due || t.done) return null;
+  const days = Math.round((new Date(t.due + 'T00:00:00') - new Date(todayStr() + 'T00:00:00')) / 86400000);
+  if (days < 0) return { cls: 'due-red', label: `逾期 ${-days} 天` };
+  if (days === 0) return { cls: 'due-red', label: '今天截止' };
+  if (days === 1) return { cls: 'due-yellow', label: '明天截止' };
+  if (days <= 3) return { cls: 'due-yellow', label: `剩 ${days} 天` };
+  if (days <= 7) return { cls: 'due-blue', label: `剩 ${days} 天` };
+  const [, m, d] = t.due.split('-');
+  return { cls: 'due-white', label: `${+m}月${+d}日` };
+}
+
+/* 跨天（零点）：已完成的任务统一隐藏；未完成的返回周池（取消 → 今日 箭头，任务保留在周池） */
 function dayRoll() {
   const today = todayStr();
   if (state.lastDay !== today) {
-    state.todayOrder = state.todayOrder.filter(id => { const t = getTask(id); return t && !t.done; });
-    state.todaySubOrder = state.todaySubOrder.filter(id => { const f = getSub(id); return f && !f.sub.done; });
+    state.todayOrder.forEach(id => { const t = getTask(id); if (t) t.inToday = false; });
+    state.todaySubOrder.forEach(id => { const f = getSub(id); if (f) f.sub.inToday = false; });
+    state.todayOrder = [];
+    state.todaySubOrder = [];
     state.lastDay = today;
     save();
   }
@@ -521,6 +549,8 @@ function cardHTML(t, pool) {
   const open = expanded.has(t.id);
 
   const chips = [];
+  const due = dueChip(t);
+  if (due) chips.push(`<span class="chip ${due.cls}" title="截止日期 ${t.due}">${due.label}</span>`);
   if (pool === 'backlog') {
     if (t.done) chips.push('<span class="chip chip-done">已完成</span>');
     else if (t.inToday) chips.push('<span class="chip chip-today">→ 今日</span>');
@@ -597,11 +627,14 @@ function renderPool(pool) {
       t.subtasks.some(s => s.title.toLowerCase().includes(q)));
     if (state.hideDone) ts = ts.filter(t => !t.done);
   }
+  if (pool === 'today' && state.hideTodayDone) ts = ts.filter(t => !t.done);
 
   const taskCards = ts.map(t => cardHTML(t, pool)).join('');
   const entryCards = poolSubIds(pool).map(sid => {
     const f = getSub(sid);
-    return f ? subEntryHTML(f.task, f.sub, pool) : '';
+    if (!f) return '';
+    if (pool === 'today' && state.hideTodayDone && f.sub.done) return '';
+    return subEntryHTML(f.task, f.sub, pool);
   }).join('');
 
   list.innerHTML = (taskCards || entryCards) ? taskCards + entryCards : emptyHTML(pool);
@@ -628,6 +661,7 @@ function renderPool(pool) {
     const chip = $('#today-done-cnt');
     chip.hidden = !doneCnt;
     chip.textContent = `今日已完成 ${doneCnt}`;
+    $('#btn-hide-today-done').textContent = state.hideTodayDone ? '显示已完成' : '隐藏已完成';
   }
 }
 
@@ -639,7 +673,7 @@ function render() {
 function addTask(pool, title) {
   const t = {
     id: uid(), title, note: '', subtasks: [],
-    done: false, doneAt: null, inWeek: false, inToday: false, createdAt: Date.now()
+    done: false, doneAt: null, due: null, inWeek: false, inToday: false, createdAt: Date.now()
   };
   if (pool === 'week') { t.inWeek = true; state.weekOrder.unshift(t.id); }
   if (pool === 'today') {
@@ -650,18 +684,15 @@ function addTask(pool, title) {
   save(); render();
 }
 
-/** 标记任务完成：级联完成全部子任务（含出库到各池的条目），并从今日归档 */
+/** 标记任务完成：级联完成全部子任务（含出库到各池的条目）；
+    完成后在今日列表划线保留，零点统一隐藏（见 dayRoll） */
 function completeTask(t) {
   t.done = true;
   t.doneAt = Date.now();
-  /* 今日列表中完成 → 自动归档回周池（出库） */
-  pull(state.todayOrder, t.id);
-  t.inToday = false;
   t.subtasks.forEach(s => {
     if (!s.done) {
       s.done = true;
       s.doneAt = Date.now();
-      if (s.inToday) { s.inToday = false; pull(state.todaySubOrder, s.id); }
     }
   });
 }
@@ -676,13 +707,12 @@ function toggleDone(t) {
   save(); render();
 }
 
-/** 勾选子任务（父卡片内 / 池内条目 均走这里）；今日完成自动出库；
+/** 勾选子任务（父卡片内 / 池内条目 均走这里）；
     子任务全部完成 → 任务自动完成；已完成任务中取消子任务 → 任务恢复未完成 */
 function toggleSub(task, sub) {
   sub.done = !sub.done;
   if (sub.done) {
     sub.doneAt = Date.now();
-    if (sub.inToday) { sub.inToday = false; pull(state.todaySubOrder, sub.id); }
     if (!task.done && task.subtasks.length && task.subtasks.every(s => s.done)) {
       completeTask(task);
       toast('子任务已全部完成 · 任务自动标记完成');
@@ -873,6 +903,10 @@ $('#btn-archive-week').addEventListener('click', () => {
   state.weekSubOrder = state.weekSubOrder.filter(id => { const f = getSub(id); return f && !f.sub.done; });
   save(); render();
   toast('已完成条目已归档回总池');
+});
+$('#btn-hide-today-done').addEventListener('click', () => {
+  state.hideTodayDone = !state.hideTodayDone;
+  save(); renderPool('today');
 });
 
 /* ================= 拖拽（Pointer Events，桌面 / 触屏通用）
@@ -1120,6 +1154,7 @@ function openEdit(id) {
   editingId = id;
   $('#f-title').value = t.title;
   $('#f-note').value = t.note || '';
+  $('#f-due').value = t.due || '';
   subsDraft = (t.subtasks || []).map(s => ({ id: s.id, title: s.title, done: s.done }));
   renderSubDraft();
   dlg.showModal();
@@ -1158,6 +1193,7 @@ $('#editForm').addEventListener('submit', e => {
   if (!title) { $('#f-title').focus(); return; }
   t.title = title;
   t.note = $('#f-note').value.trim();
+  t.due = $('#f-due').value || null;
   const removed = t.subtasks.filter(s => !subsDraft.some(d => d.id === s.id)).map(s => s.id);
   removed.forEach(sid => { pull(state.weekSubOrder, sid); pull(state.todaySubOrder, sid); });
   t.subtasks = subsDraft.filter(s => s.title.trim()).map(s => ({ id: s.id, title: s.title.trim(), done: !!s.done }));
@@ -1241,7 +1277,7 @@ $('#fileInput').addEventListener('change', e => {
 
 $('#btnWipe').addEventListener('click', () => {
   if (!confirm('确定清空所有任务吗？此操作不可恢复，建议先「导出」备份。')) return;
-  state = { tasks: [], weekOrder: [], todayOrder: [], weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false };
+  state = { tasks: [], weekOrder: [], todayOrder: [], weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false, hideTodayDone: false };
   save(); render();
   toast('已清空');
 });
@@ -1255,6 +1291,13 @@ $('#btnWipe').addEventListener('click', () => {
   render();
   /* 每次打开：仅展开「今日动态列表」，其余折叠等待手动展开 */
   $$('.pool').forEach(p => setPoolOpen(p, p.dataset.pool === 'today'));
+  /* 页面开着跨过零点：完成的统一隐藏，未完成的返回周池 */
+  setInterval(() => {
+    if (state.lastDay !== todayStr()) {
+      dayRoll(); render();
+      toast('已跨天：未完成任务已返回周池');
+    }
+  }, 30000);
 })();
 </script>
 </body>
