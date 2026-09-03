@@ -238,6 +238,13 @@
     padding:8px 18px;border-radius:8px;cursor:pointer;
   }
   .primary-btn:hover{background:#33383f}
+  .sync-intro{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.65}
+  .sync-tip{font-size:11.5px;color:var(--faint);margin:-7px 0 14px;line-height:1.65}
+  .sync-tip a{color:#2563EB}
+  .fld-check{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+  .fld-check input{width:auto;flex:none}
+  .sync-status{font-size:12.5px;color:var(--muted);min-height:18px}
+  .today-label.is-err{color:var(--red)}
 
   /* ---------- 其他 ---------- */
   #toast{
@@ -274,6 +281,8 @@
     </div>
     <div class="topbar-actions">
       <span class="today-label" id="todayLabel"></span>
+      <span class="today-label" id="sync-status" title=""></span>
+      <button class="ghost-btn" id="btnSync" title="多设备同步（GitHub 私密 Gist）">同步</button>
       <button class="ghost-btn" id="btnExport" title="将全部数据导出为 JSON 备份文件">导出</button>
       <button class="ghost-btn" id="btnImport" title="从 JSON 备份恢复数据">导入</button>
       <button class="ghost-btn danger" id="btnWipe" title="清空全部任务">清空</button>
@@ -369,6 +378,38 @@
   </form>
 </dialog>
 
+<dialog id="syncDlg">
+  <form class="dlg-form" method="dialog" onsubmit="return false">
+    <h3>多设备同步</h3>
+    <p class="sync-intro">通过你 GitHub 账号下的<b>私密 Gist</b> 同步数据：不公开、自带历史版本。令牌只保存在本机浏览器，不会随数据上传；不配置则完全离线使用，与现在一样。</p>
+    <label class="fld">
+      <span class="fld-label">GitHub 访问令牌</span>
+      <input type="password" id="sy-token" placeholder="粘贴细粒度令牌（只需 Gists 读写权限）" autocomplete="off">
+    </label>
+    <p class="sync-tip">没有令牌？到 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens 生成，Account permissions 只勾选 <b>Gists: Read and write</b>。<a href="https://github.com/settings/personal-access-types/new" target="_blank" rel="noopener">去生成 →</a></p>
+    <label class="fld fld-check">
+      <input type="checkbox" id="sy-auto" checked>
+      <span>自动同步：打开页面时拉取，改动后 2.5 秒自动推送</span>
+    </label>
+    <div class="fld">
+      <span class="fld-label">状态</span>
+      <div id="sy-status" class="sync-status"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="ghost-btn danger" id="sy-unbind" title="本机停止同步，云端数据保留">解绑</button>
+      <span class="spacer"></span>
+      <button type="button" class="ghost-btn" id="sy-pull">用云端覆盖本地</button>
+      <button type="button" class="ghost-btn" id="sy-push">用本地覆盖云端</button>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="ghost-btn" id="sy-close">关闭</button>
+      <button type="button" class="ghost-btn" id="sy-now">立即同步</button>
+      <span class="spacer"></span>
+      <button type="button" class="primary-btn" id="sy-connect">连接云端</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="subDlg">
   <form class="dlg-form" id="subEditForm" method="dialog">
     <h3>编辑子任务<span class="dlg-sub-ref" id="fs-ref"></span></h3>
@@ -435,7 +476,8 @@ function seedState() {
   b.due = plusDays(6);   /* 示例：一周内显示蓝色 */
   return {
     tasks: [a, b, c], weekOrder: [b.id, c.id], todayOrder: [c.id],
-    weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false, hideTodayDone: false
+    weekSubOrder: [], todaySubOrder: [], lastDay: todayStr(), hideDone: false, hideTodayDone: false,
+    updatedAt: Date.now()
   };
 }
 
@@ -463,7 +505,8 @@ function normalize(s) {
     tasks,
     weekOrder: clean(s.weekOrder), todayOrder: clean(s.todayOrder),
     weekSubOrder: cleanSub(s.weekSubOrder), todaySubOrder: cleanSub(s.todaySubOrder),
-    lastDay: todayStr(), hideDone: !!s.hideDone, hideTodayDone: !!s.hideTodayDone
+    lastDay: todayStr(), hideDone: !!s.hideDone, hideTodayDone: !!s.hideTodayDone,
+    updatedAt: (typeof s.updatedAt === 'number' && isFinite(s.updatedAt)) ? s.updatedAt : null
   };
 }
 
@@ -476,8 +519,10 @@ function loadState() {
 }
 
 function save() {
+  state.updatedAt = Date.now();
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
   catch (_) { toast('保存失败：浏览器本地存储不可用'); }
+  queuePush();
 }
 
 const getTask = id => state.tasks.find(t => t.id === id);
@@ -600,12 +645,14 @@ function cardHTML(t, pool) {
 /** 出库子任务在池内的独立条目：显示为「主任务.编号」+ 子任务内容 */
 function subEntryHTML(task, sub, pool) {
   const num = subNum(task, sub);
+  const chip = (pool === 'week' && !sub.done && sub.inToday)
+    ? '<span class="chip chip-today sub-chip">→ 今日</span>' : '';
   return `<article class="card sub-entry${sub.done ? ' is-done' : ''}" data-sub="${sub.id}" data-task="${task.id}">
     <div class="card-row">
       <span class="grip" title="拖动：池内排序 / 拖到其他池移动；拖回总池=收回">${I.grip}</span>
       <button class="check mini${sub.done ? ' on' : ''}" data-act="sub" data-sid="${sub.id}" title="${sub.done ? '取消' : '完成'}">${I.check}</button>
       <div class="card-body" data-act="subedit" data-sid="${sub.id}">
-        <div class="card-title"><span class="sub-ref">${esc(task.title)}.${num}</span>${esc(sub.title)}</div>
+        <div class="card-title"><span class="sub-ref">${esc(task.title)}.${num}</span>${esc(sub.title)}${chip}</div>
       </div>
       <div class="card-acts">
         <button class="icon-btn" data-act="subedit" data-sid="${sub.id}" title="编辑此子任务">${I.pen}</button>
@@ -746,9 +793,9 @@ function applySubPoolMove(sub, toPool, index) {
     if (sub.inToday) { sub.inToday = false; pull(state.todaySubOrder, sub.id); }
     sub.inWeek = true;
     insertIntoOrder(state.weekSubOrder, sub.id, index);
-  } else { /* today */
+  } else { /* today：只进今日，不在周池隐式复制一份（子任务的「家」是主任务卡片）；
+              已在周池显式出库的条目则保留，并在周池条目上显示 → 今日 箭头 */
     sub.inToday = true;
-    if (!sub.inWeek) { sub.inWeek = true; state.weekSubOrder.push(sub.id); }
     insertIntoOrder(state.todaySubOrder, sub.id, index);
   }
   return true;
@@ -1282,6 +1329,216 @@ $('#btnWipe').addEventListener('click', () => {
   toast('已清空');
 });
 
+/* ================= 多设备同步（GitHub 私密 Gist，可选；不配置则完全离线） ================= */
+const SYNC_KEY = 'three-layer-task-pool:sync';
+const GH_API = 'https://api.github.com';
+const GIST_DESC = 'three-layer-task-pool';
+let pushTimer = 0;
+
+function syncCfg() {
+  try { return JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); } catch (_) { return null; }
+}
+function saveSyncCfg(cfg) {
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify(cfg)); } catch (_) {}
+}
+const syncBound = () => { const c = syncCfg(); return !!(c && c.token && c.gistId); };
+
+async function ghRequest(method, path, token, body) {
+  const res = await fetch(GH_API + path, {
+    method,
+    headers: Object.assign(
+      { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+      body ? { 'Content-Type': 'application/json' } : {}
+    ),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.status === 204 ? null : res.json();
+}
+
+/* 在用户的 Gist 列表里找本应用的数据 Gist（按固定描述匹配） */
+function findGist(gists) {
+  const hit = (gists || []).find(g => g && g.description === GIST_DESC && g.files && g.files['data.json']);
+  return hit ? hit.id : null;
+}
+
+/* 读取云端数据 → 规范化后的 state；云端为空/无效返回 null */
+async function readRemote(cfg) {
+  const g = await ghRequest('GET', '/gists/' + cfg.gistId, cfg.token);
+  const f = g && g.files && g.files['data.json'];
+  if (!f) return null;
+  if (f.truncated) throw new Error('TRUNCATED');
+  const txt = f.content;
+  if (!txt || !txt.trim()) return null;
+  return normalize(JSON.parse(txt));
+}
+
+/* 冲突判定：返回 'remote' | 'local' | 'none' */
+function mergeDecision(localTs, remoteTs) {
+  const l = localTs || 0, r = remoteTs || 0;
+  return r > l ? 'remote' : (l > r ? 'local' : 'none');
+}
+
+function applyRemote(remote) {
+  state = remote;
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
+  render();
+}
+
+function fmtTime(ts) {
+  if (!ts) return '从未';
+  const d = new Date(ts);
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function setSyncStatus(text, isErr) {
+  const top = $('#sync-status');
+  if (top) {
+    top.textContent = text;
+    top.title = text;
+    top.classList.toggle('is-err', !!isErr);
+  }
+  const st = $('#sy-status');
+  if (st) { st.textContent = text; }
+}
+
+function refreshSyncUI() {
+  const cfg = syncCfg();
+  const bound = syncBound();
+  const top = $('#sync-status');
+  if (top) {
+    top.textContent = bound ? '同步 ' + fmtTime(cfg.lastSyncedAt) : '';
+    top.title = bound ? '上次同步：' + fmtTime(cfg.lastSyncedAt) : '';
+    top.classList.remove('is-err');
+  }
+  const st = $('#sy-status');
+  if (st) st.textContent = bound
+    ? `已连接云端（Gist ${String(cfg.gistId).slice(0, 4)}…${String(cfg.gistId).slice(-4)}）· 上次同步 ${fmtTime(cfg.lastSyncedAt)}`
+    : '未连接';
+  if ($('#sy-auto')) $('#sy-auto').checked = cfg ? !!cfg.autoPush : true;
+}
+
+function syncError(err) {
+  const msg = String((err && err.message) || err);
+  let text;
+  if (msg.includes('401')) text = '同步失败：令牌无效或已过期，请重新配置';
+  else if (msg.includes('403') || msg.includes('429')) text = '同步失败：请求被限流，请稍后手动同步';
+  else if (msg.includes('TRUNCATED')) text = '同步失败：云端数据异常（过大被截断），建议导出本地备份';
+  else text = '同步失败：网络不可用或离线（数据仍保存在本机）';
+  setSyncStatus(text, true);
+}
+
+/* 改动后防抖推送：打开即用的应用不需要每次操作都打一次 API */
+function queuePush() {
+  const cfg = syncCfg();
+  if (!cfg || !cfg.token || !cfg.gistId || !cfg.autoPush) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { pushRemote(false); }, 2500);
+}
+
+/* 智能推送：远端更新则提示采用云端，否则上传本地（force=true 跳过检查直接覆盖） */
+async function pushRemote(force) {
+  const cfg = syncCfg();
+  if (!cfg || !cfg.token || !cfg.gistId) { toast('请先在「同步」中连接云端'); return; }
+  try {
+    if (!force) {
+      const remote = await readRemote(cfg);
+      if (remote && (remote.updatedAt || 0) > (state.updatedAt || 0)) {
+        const takeRemote = confirm('云端有更新的版本（可能在其他设备上修改过）。\n\n「确定」= 采用云端版本（丢弃本机未同步的改动）\n「取消」= 用本机版本覆盖云端');
+        if (takeRemote) {
+          applyRemote(remote);
+          cfg.lastSyncedAt = Date.now(); saveSyncCfg(cfg); setSyncStatus('已采用云端版本');
+          toast('已采用云端版本');
+          return;
+        }
+      } else if (remote && mergeDecision(state.updatedAt || 0, remote.updatedAt || 0) === 'none') {
+        cfg.lastSyncedAt = Date.now(); saveSyncCfg(cfg); setSyncStatus('已是最新');
+        return;
+      }
+    }
+    await ghRequest('PATCH', '/gists/' + cfg.gistId, cfg.token, {
+      description: GIST_DESC,
+      files: { 'data.json': { content: JSON.stringify(state) } }
+    });
+    cfg.lastSyncedAt = Date.now(); saveSyncCfg(cfg);
+    setSyncStatus('已同步 ' + fmtTime(cfg.lastSyncedAt));
+  } catch (err) { syncError(err); }
+}
+
+/* 拉取：远端较新才应用（打开页面时调用） */
+async function pullRemote() {
+  const cfg = syncCfg();
+  if (!cfg || !cfg.token || !cfg.gistId) return;
+  try {
+    const remote = await readRemote(cfg);
+    if (!remote) {                       /* 云端为空：用本地初始化 */
+      await pushRemote(true);
+      setSyncStatus('云端为空，已上传本机数据');
+      return;
+    }
+    if (mergeDecision(state.updatedAt || 0, remote.updatedAt || 0) === 'remote') {
+      applyRemote(remote);
+      toast('已从云端同步最新数据');
+    }
+    cfg.lastSyncedAt = Date.now(); saveSyncCfg(cfg);
+    setSyncStatus('已同步 ' + fmtTime(cfg.lastSyncedAt));
+  } catch (err) { syncError(err); }
+}
+
+async function forcePull() {
+  const cfg = syncCfg();
+  if (!cfg || !cfg.token || !cfg.gistId) { toast('请先连接云端'); return; }
+  try {
+    const remote = await readRemote(cfg);
+    if (!remote) { toast('云端为空'); return; }
+    applyRemote(remote);
+    cfg.lastSyncedAt = Date.now(); saveSyncCfg(cfg);
+    setSyncStatus('已用云端覆盖本地');
+    toast('已用云端版本覆盖本地');
+  } catch (err) { syncError(err); }
+}
+
+/* 首次绑定：查找已有数据 Gist → 找到则拉取；没有则创建并上传本机数据 */
+async function connectCloud() {
+  const token = $('#sy-token').value.trim();
+  if (!token) { toast('请先粘贴访问令牌'); return; }
+  setSyncStatus('正在连接云端…');
+  try {
+    const gists = await ghRequest('GET', '/gists?per_page=100', token);
+    const gistId = findGist(gists);
+    if (gistId) {
+      saveSyncCfg({ token, gistId, autoPush: $('#sy-auto').checked, lastSyncedAt: Date.now() });
+      await pullRemote();
+      refreshSyncUI();
+      toast('已连接云端并同步数据');
+    } else {
+      const created = await ghRequest('POST', '/gists', token, {
+        description: GIST_DESC, public: false,
+        files: { 'data.json': { content: JSON.stringify(state) } }
+      });
+      saveSyncCfg({ token, gistId: created.id, autoPush: $('#sy-auto').checked, lastSyncedAt: Date.now() });
+      refreshSyncUI();
+      setSyncStatus('已创建云端存储并上传本机数据');
+      toast('已创建云端存储并上传本机数据');
+    }
+  } catch (err) { syncError(err); }
+}
+
+$('#btnSync').addEventListener('click', () => { refreshSyncUI(); $('#syncDlg').showModal(); });
+$('#sy-close').addEventListener('click', () => $('#syncDlg').close());
+$('#syncDlg').addEventListener('click', e => { if (e.target === $('#syncDlg')) $('#syncDlg').close(); });
+$('#sy-connect').addEventListener('click', () => connectCloud());
+$('#sy-now').addEventListener('click', () => pushRemote(false));
+$('#sy-auto').addEventListener('change', () => { const cfg = syncCfg(); if (cfg) { cfg.autoPush = $('#sy-auto').checked; saveSyncCfg(cfg); } });
+$('#sy-push').addEventListener('click', () => { if (confirm('确定用本机数据覆盖云端？')) pushRemote(true); });
+$('#sy-pull').addEventListener('click', () => { if (confirm('确定丢弃本机数据、用云端覆盖？建议先「导出」备份。')) forcePull(); });
+$('#sy-unbind').addEventListener('click', () => {
+  if (!confirm('解绑后本机停止同步（云端数据与令牌仍保留在 GitHub）。确定解绑？')) return;
+  localStorage.removeItem(SYNC_KEY);
+  refreshSyncUI();
+  toast('已解绑');
+});
+
 /* ================= 启动 ================= */
 (function boot() {
   state = loadState();
@@ -1298,6 +1555,9 @@ $('#btnWipe').addEventListener('click', () => {
       toast('已跨天：未完成任务已返回周池');
     }
   }, 30000);
+  /* 已配置云同步：打开时后台拉取（本地先渲染，不阻塞使用） */
+  refreshSyncUI();
+  if (syncBound()) pullRemote();
 })();
 </script>
 </body>
