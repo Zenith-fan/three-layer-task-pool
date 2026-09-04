@@ -1102,12 +1102,16 @@ function poolTargetFor(el, taskId) {
   drag.target = { type: 'pool', pool: poolEl.dataset.pool, index: idx, ids: cards.map(c => c.dataset.id) };
 }
 
+/* 子任务池间投放规则：源自周池的子任务不允许再投回周池（避免同池出现重复条目 / 无意义重排） */
+const subDropAllowed = (fromPool, toPool) => !(fromPool === 'week' && toPool === 'week');
+
 /* 子任务投放目标：锚点为出库条目（排除自身在各池的条目副本） */
 function subPoolTargetFor(el, subId) {
   const poolEl = el ? el.closest('.pool') : null;
-  setHoverPool(poolEl);
   IND.remove();
-  if (!poolEl) { drag.target = null; clearExpandTimer(); return; }
+  const allowed = !!poolEl && subDropAllowed(drag.fromPool, poolEl.dataset.pool);
+  setHoverPool(allowed ? poolEl : null);
+  if (!allowed) { drag.target = null; clearExpandTimer(); return; }
   maybeAutoExpand(poolEl);
 
   const list = poolEl.querySelector('.list');
@@ -1416,6 +1420,8 @@ function refreshSyncUI() {
     ? `已连接云端（Gist ${String(cfg.gistId).slice(0, 4)}…${String(cfg.gistId).slice(-4)}）· 上次同步 ${fmtTime(cfg.lastSyncedAt)}`
     : '未连接';
   if ($('#sy-auto')) $('#sy-auto').checked = cfg ? !!cfg.autoPush : true;
+  /* 令牌回填：已保存过就直接显示，不用每次重新粘贴 */
+  if ($('#sy-token')) $('#sy-token').value = (cfg && cfg.token) || '';
 }
 
 function syncError(err) {
