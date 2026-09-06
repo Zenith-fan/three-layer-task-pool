@@ -702,8 +702,9 @@ function renderPool(pool) {
   if (pool === 'today') {
     const undone = poolTasks('today').filter(t => !t.done).length +
       state.todaySubOrder.map(getSub).filter(Boolean).filter(f => !f.sub.done).length;
-    const doneCnt = state.tasks.reduce((n, t) => n + (t.done && sameDay(t.doneAt) ? 1 : 0), 0) +
-      state.tasks.reduce((n, t) => n + t.subtasks.reduce((m, s) => m + (s.done && sameDay(s.doneAt) ? 1 : 0), 0), 0);
+    /* 今日完成只统计今日列表内的条目：在其他池（周池/总池）完成的任务不计入 */
+    const doneCnt = state.todayOrder.map(getTask).filter(t => t && t.done && sameDay(t.doneAt)).length +
+      state.todaySubOrder.map(getSub).filter(f => f && f.sub.done && sameDay(f.sub.doneAt)).length;
     $('#bar-cnt-today').textContent = `${undone} 项${doneCnt ? ` · 今日完成 ${doneCnt}` : ''}`;
     const chip = $('#today-done-cnt');
     chip.hidden = !doneCnt;
