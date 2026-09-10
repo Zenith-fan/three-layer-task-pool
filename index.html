@@ -335,7 +335,7 @@
       <span class="bar-count" id="bar-cnt-today"></span>
     </button>
     <div class="pool-body">
-      <p class="pool-hint">今天要执行的任务；完成的任务划线保留到零点自动隐藏（计入今日已完成，也可手动隐藏），未完成的零点自动返回周池</p>
+      <p class="pool-hint">今天要执行的任务；完成的任务划线保留到零点自动隐藏（计入今日已完成，也可手动隐藏），未完成的零点自动返回周池；标记 ⟳ 每日 的任务零点自动重置并回到今日</p>
       <div class="pool-tools">
         <span class="chip chip-done" id="today-done-cnt" hidden></span>
         <button class="chip-btn" id="btn-hide-today-done">隐藏已完成</button>
@@ -363,6 +363,10 @@
     <label class="fld">
       <span class="fld-label">截止日期</span>
       <input type="date" id="f-due">
+    </label>
+    <label class="fld fld-check">
+      <input type="checkbox" id="f-repeat">
+      <span>每日重复 · 零点自动重置完成状态并回到今日列表</span>
     </label>
     <div class="fld">
       <span class="fld-label">子任务 <span id="f-subcount"></span></span>
@@ -494,6 +498,7 @@ function normalize(s) {
       : [],
     done: !!t.done, doneAt: t.doneAt || null,
     due: (typeof t.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null,
+    repeatDaily: !!t.repeatDaily,
     inWeek: !!t.inWeek, inToday: !!t.inToday, createdAt: t.createdAt || Date.now()
   }));
   const ids = new Set(tasks.map(t => t.id));
@@ -548,13 +553,25 @@ function dueChip(t) {
   return { cls: 'due-white', label: `${+m}月${+d}日` };
 }
 
-/* 跨天（零点）：已完成的任务统一隐藏；未完成的返回周池（取消 → 今日 箭头，任务保留在周池） */
+/* 跨天（零点）：已完成的任务统一隐藏；未完成的返回周池（取消 → 今日 箭头，任务保留在周池）；
+   每日重复任务例外——重置完成状态并留在今日列表（打卡），被拖回周池的不自动复活 */
 function dayRoll() {
   const today = todayStr();
   if (state.lastDay !== today) {
-    state.todayOrder.forEach(id => { const t = getTask(id); if (t) t.inToday = false; });
+    state.todayOrder = state.todayOrder.filter(id => {
+      const t = getTask(id);
+      if (!t) return false;
+      if (t.repeatDaily) {
+        t.done = false; t.doneAt = null;
+        t.subtasks.forEach(s => { s.done = false; s.doneAt = null; });
+        t.inToday = true;                                        /* 新的一天继续打卡 */
+        if (!t.inWeek) { t.inWeek = true; state.weekOrder.push(t.id); }
+        return true;                                             /* 保留在今日序列 */
+      }
+      t.inToday = false;
+      return false;
+    });
     state.todaySubOrder.forEach(id => { const f = getSub(id); if (f) f.sub.inToday = false; });
-    state.todayOrder = [];
     state.todaySubOrder = [];
     state.lastDay = today;
     save();
@@ -596,6 +613,7 @@ function cardHTML(t, pool) {
   const chips = [];
   const due = dueChip(t);
   if (due) chips.push(`<span class="chip ${due.cls}" title="截止日期 ${t.due}">${due.label}</span>`);
+  if (t.repeatDaily) chips.push('<span class="chip chip-done" title="每日重复：零点自动重置完成状态并回到今日列表">⟳ 每日</span>');
   if (pool === 'backlog') {
     if (t.done) chips.push('<span class="chip chip-done">已完成</span>');
     else if (t.inToday) chips.push('<span class="chip chip-today">→ 今日</span>');
@@ -945,6 +963,23 @@ board.addEventListener('keydown', e => {
 });
 
 $('#search-backlog').addEventListener('input', () => renderPool('backlog'));
+
+/* 键盘快捷键：/ 聚焦总池搜索，1/2/3 切换三栏展开折叠（输入中或弹窗打开时不触发） */
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const src = e.target;
+  if (src && (src.tagName === 'INPUT' || src.tagName === 'TEXTAREA' || src.isContentEditable)) return;
+  if (($('#dlg') && $('#dlg').open) || ($('#subDlg') && $('#subDlg').open) || ($('#syncDlg') && $('#syncDlg').open)) return;
+  if (e.key === '/') {
+    e.preventDefault();
+    const backlog = $$('.pool')[0];
+    if (backlog) setPoolOpen(backlog, true);
+    $('#search-backlog').focus();
+  } else if (e.key === '1' || e.key === '2' || e.key === '3') {
+    const p = $$('.pool')[+e.key - 1];
+    if (p) setPoolOpen(p, !p.classList.contains('open'));
+  }
+});
 $('#btn-hide-done').addEventListener('click', () => { state.hideDone = !state.hideDone; save(); renderPool('backlog'); });
 $('#btn-archive-week').addEventListener('click', () => {
   state.weekOrder = state.weekOrder.filter(id => { const t = getTask(id); return t && !t.done; });
@@ -1207,6 +1242,7 @@ function openEdit(id) {
   $('#f-title').value = t.title;
   $('#f-note').value = t.note || '';
   $('#f-due').value = t.due || '';
+  $('#f-repeat').checked = !!t.repeatDaily;
   subsDraft = (t.subtasks || []).map(s => ({ id: s.id, title: s.title, done: s.done }));
   renderSubDraft();
   dlg.showModal();
@@ -1248,7 +1284,14 @@ $('#editForm').addEventListener('submit', e => {
   t.due = $('#f-due').value || null;
   const removed = t.subtasks.filter(s => !subsDraft.some(d => d.id === s.id)).map(s => s.id);
   removed.forEach(sid => { pull(state.weekSubOrder, sid); pull(state.todaySubOrder, sid); });
-  t.subtasks = subsDraft.filter(s => s.title.trim()).map(s => ({ id: s.id, title: s.title.trim(), done: !!s.done }));
+  /* 保留子任务的池标志与完成时间（此前每次保存编辑都会丢这些字段） */
+  const prev = Object.fromEntries(t.subtasks.map(s => [s.id, s]));
+  t.subtasks = subsDraft.filter(s => s.title.trim()).map(s => ({
+    id: s.id, title: s.title.trim(), done: !!s.done,
+    doneAt: s.done ? ((prev[s.id] && prev[s.id].doneAt) || Date.now()) : null,
+    inWeek: !!(prev[s.id] && prev[s.id].inWeek), inToday: !!(prev[s.id] && prev[s.id].inToday)
+  }));
+  t.repeatDaily = $('#f-repeat').checked;
   save(); render(); dlg.close();
 });
 $('#f-cancel').addEventListener('click', () => dlg.close());
@@ -1559,7 +1602,7 @@ $('#sy-unbind').addEventListener('click', () => {
   setInterval(() => {
     if (state.lastDay !== todayStr()) {
       dayRoll(); render();
-      toast('已跨天：未完成任务已返回周池');
+      toast('已跨天：未完成返回周池，每日任务已刷新');
     }
   }, 30000);
   /* 已配置云同步：打开时后台拉取（本地先渲染，不阻塞使用） */
