@@ -467,6 +467,7 @@ function toast(msg) {
 /* ================= 数据 ================= */
 let state;
 const expanded = new Set();   // 展开子任务的卡片 id
+const undoSnapshots = new Map();   // 任务 id → 勾选主任务前各子任务的完成状态快照（仅会话内，不序列化）
 
 function seedState() {
   const mk = (title, note, subs, week, today) => ({
@@ -753,6 +754,8 @@ function addTask(pool, title) {
 /** 标记任务完成：级联完成全部子任务（含出库到各池的条目）；
     完成后在今日列表划线保留，零点统一隐藏（见 dayRoll） */
 function completeTask(t) {
+  /* 级联前快照各子任务完成状态，取消勾选时可恢复 */
+  undoSnapshots.set(t.id, t.subtasks.map(s => ({ id: s.id, done: s.done, doneAt: s.doneAt })));
   t.done = true;
   t.doneAt = Date.now();
   t.subtasks.forEach(s => {
@@ -767,8 +770,16 @@ function toggleDone(t) {
   if (!t.done) {
     completeTask(t);            /* 勾选主任务 = 全部子任务一并完成 */
   } else {
-    t.done = false;             /* 取消完成：保留各子任务的完成状态 */
+    t.done = false;             /* 取消完成：恢复到勾选主任务前的子任务完成状态 */
     t.doneAt = null;
+    const snap = undoSnapshots.get(t.id);
+    if (snap) {
+      t.subtasks.forEach(s => {
+        const before = snap.find(x => x.id === s.id);
+        if (before) { s.done = before.done; s.doneAt = before.doneAt; }
+      });
+      undoSnapshots.delete(t.id);
+    }
   }
   save(); render();
 }
@@ -828,6 +839,7 @@ function delTask(t) {
   pull(state.todayOrder, t.id);
   t.subtasks.forEach(s => { pull(state.weekSubOrder, s.id); pull(state.todaySubOrder, s.id); });
   expanded.delete(t.id);
+  undoSnapshots.delete(t.id);
   save(); render();
   toast('已删除');
 }
@@ -856,9 +868,13 @@ function applyMove(fromPool, id, toPool, index, dispIds) {
   if (!t) return;
 
   if (toPool === 'backlog') {
-    t.inWeek = false; t.inToday = false;
-    pull(state.weekOrder, id);
-    pull(state.todayOrder, id);
+    if (fromPool !== 'backlog') {
+      /* 从周池/今日真正移回总池：清除池标志并移出对应序列；
+         总池内拖动（backlog→backlog）则保持 inWeek/inToday 不变 */
+      t.inWeek = false; t.inToday = false;
+      pull(state.weekOrder, id);
+      pull(state.todayOrder, id);
+    }
   } else if (toPool === 'week') {
     t.inToday = false;                              /* 今日 → 周：未完成返回，箭头消失 */
     pull(state.todayOrder, id);
@@ -870,8 +886,9 @@ function applyMove(fromPool, id, toPool, index, dispIds) {
     insertIntoOrder(state.todayOrder, id, index);
   }
 
-  /* 总池（tasks 数组）顺序仅在涉及 backlog 时调整 */
-  if (fromPool === 'backlog' || toPool === 'backlog') {
+  /* 总池（tasks 数组）顺序仅在“目标为总池”时调整；
+     总池 → 周/今日不重排，任务留在原位 */
+  if (toPool === 'backlog') {
     const arr = state.tasks;
     const from = arr.findIndex(x => x.id === id);
     const moving = from > -1 ? arr.splice(from, 1)[0] : t;
